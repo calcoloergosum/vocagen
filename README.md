@@ -1,18 +1,26 @@
 # VocaGen
 
- I was trying to learn Hindi. Learning a language is already hard, but learning Hindi was harder because of lack of study material. With help of LLM, a language that is widely used but lacks material, can be intermediate-friendly.
+This project is currently Work In Progress.
 
- I strongly believe brute-force memorizing words is both the most effective and efficient way to become advanced user of a language. But such approach does not make much sense unless you already know grammatical structure, or phonetic features. I personally would first use gamification approach such as Duolingo, then move to memorizing words. 
+Example sentence generation, featuring:
+- Audio, Image, example sentences
+- Fairly minor languages
+- Any level of students: beginners, intermediate, and advanced.
+- Full automation (!)
+- Web frontend, or use as audiobook.
 
- Words are easier to recall when it appears in a context. It make sense to me to use example sentences to memorize a word.
+Screenshot of frontend:
+
+ ![screenshot](assets/screenshot.png)
+
 
 ## Samples
 
 | L1 | L2 | Download Link | Reviewed by | Comment by contributor |
 | --- | --- | --- | --- | --- |
 | English | Hindi | | | Pretty good, but the language is too pure with no foreign-origin words, which makes it sound a bit off |
-| Japanese | English | TODO | |
-| Japanese | Korean | This is very broken | |
+| Japanese | English | TODO | | |
+| Japanese | Korean | TODO | | This seems very broken |
 
 ## Pipeline
 
