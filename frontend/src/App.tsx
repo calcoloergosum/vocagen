@@ -41,11 +41,11 @@ function App() {
   }, [currentSentence]);
 
   return (
-    <div style={{ width: "100%", height: "100%" }}>
+    <div>
       {currentSentence && (
         /* Image in full screen, and overlay the sentence in the middle on top of the image */
         <div>
-          <img src={`${BACKEND}/${currentSentence?.imageUrl}`} alt="Image" style={{ width: "100%", height: "100%", objectFit: "cover"}} />
+          <img src={`${BACKEND}/${currentSentence?.imageUrl}`} alt="Image" style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block"}} />
           {/* Text align center */}
           <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', transform: 'translate(0%, -50%)' }}>
 
