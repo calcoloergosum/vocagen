@@ -7,7 +7,8 @@ Example sentence generation, featuring:
 - Fairly minor languages
 - Any level of students: beginners, intermediate, and advanced.
 - Full automation (!)
-- Web frontend, or use as audiobook.
+- Web frontend
+- Export as audiobook
 
 Screenshot of frontend:
 
@@ -39,6 +40,32 @@ Sample commands can be found in `samples/sample_*.sh`. Step by step:
 6. Make an audio. I used GCP TTS API.
 
 After everything is done, run frontend by `cd frontend && npm start`. Also, run backend by `python backend.py`.
+
+Running the sample generates files with following directory structure:
+```
+assets
+├── hi (the language code name of L2)
+│   ├── audio
+│   │   ├── 001815...aafb31_en-US-Wavenet-H.mp3
+│   │   ├── ...(sentence hash + voice names)
+│   │   └── ffefc2...75e6a6_en-US-Wavenet-H.mp3
+│   ├── audio_per_word
+│   │   ├── 001815...aafb31.mp3
+│   │   ├── ... (L1 sentence hashes + ".mp3")
+│   │   └── ffefc2...75e6a6.mp3
+│   ├── image
+│   │   ├── 0051ce...289124.png
+│   │   ├── ... (L1 sentence hashes + ".png")
+│   │   └── ffe80f...485ef3.png
+│   ├── llm
+│   │   ├── 00001.json
+│   │   ├── ... ('rank' column value in frequency.csv file + ".json")
+│   │   └── 00661.json
+│   ├── frequency.csv
+│   └── sentences.json (Translation of L2 into L1 sentences)
+├── ko
+│   ...
+```
 
 ## Assets
 
