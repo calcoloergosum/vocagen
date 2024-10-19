@@ -1,7 +1,6 @@
-import pathlib
-import json
 import collections
-
+import json
+import pathlib
 
 word2locinfo = collections.defaultdict(list)
 for p in pathlib.Path("assets/en-hi/llm").glob("*.json"):

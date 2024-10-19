@@ -16,10 +16,21 @@
 
 ## Pipeline
 
-If you want to generate your own, here are the pipeline that I followed.
+Pipeline requires 3 environment variables:
+- `$OPENAI_API_KEY`: OpenAI's api key.
+- `$GOOGLE_APPLICATION_CREDENTIALS`: Google Cloud Platform's api key.
+- `$PROJECT_ID` Google Cloud Platform's Project name for the above credentials.
 
-1. Prepare words list. Sort by frequency, and throw it at an LLM. I used OpenAI's `gpt3.5-turbo`. Ask it to format it for you so that it is easier to parse.
+Sample commands can be found in `samples/sample_*.sh`. Step by step:
 
+1. Prepare words list.
+2. Sort by frequency. For each word:
+3. Throw it at an LLM to make 10 example sentences. I used OpenAI.
+4. Translate the sentences. I used GCP Translate API. For each sentence:
+5. Make an image. I used local ComfyUI API.
+6. Make an audio. I used GCP TTS API.
+
+After everything is done, run frontend by `cd frontend && npm start`. Also, run backend by `python backend.py`.
 
 ## Assets
 

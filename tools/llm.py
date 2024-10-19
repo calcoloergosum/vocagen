@@ -1,11 +1,11 @@
+import argparse
+import json
+import logging
+from pathlib import Path
+
 import pandas as pd
 import tqdm
-import json
-
-from pathlib import Path
 from openai import OpenAI
-import argparse
-import logging
 
 
 def ordinal(n: int):
@@ -20,16 +20,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("frequency_csv", type=Path)
     parser.add_argument("save_to", type=Path, help="Suggested format: $ROOT/$LANG_CODE/llm")
-    parser.add_argument("name_L1", type=str, help="Name of L1 language. e.g. English, Hindi, ...")
-    parser.add_argument("name_L2", type=str, help="Name of L2 language. e.g. English, Hindi, ...")
-    parser.add_argument("code_L1", type=str, help="Language code of L1 language. e.g. en, hi, ko, ja, ...")
-    parser.add_argument("code_L2", type=str, help="Language code of L2 language. e.g. en, hi, ko, ja, ...")
-    parser.add_argument("script_L1", type=Path, help="Name of script in L1 language. e.g. Alphabet, Devanagari, Hangul, ...")
-    parser.add_argument("script_L2", type=Path, help="Name of script in L2 language. e.g. Alphabet, Devanagari, Hangul, ...")
-    parser.add_argument("word_L1", type=str)
-    parser.add_argument("word_L2", type=str)
-    parser.add_argument("sentence_L1", type=str)
-    parser.add_argument("sentence_L2", type=str)
+    parser.add_argument("name", type=str, help="Name of the language. e.g. English, Hindi, ...")
+    parser.add_argument("script", type=Path, help="Name of script in the language. e.g. Alphabet, Devanagari, Hangul, ...")
+    parser.add_argument("sentence", type=str, help="Example sentence in the language.")
+    parser.add_argument("--max-words", type=int, help="Maximum number of words to generate sentences from.", default=1000)
 
     args = parser.parse_args()
     args.save_to.mkdir(parents=True, exist_ok=True)
@@ -37,32 +31,27 @@ def main():
     client = OpenAI()
 
     df = pd.read_csv(args.frequency_csv)
-    for i in tqdm.tqdm(range(0, len(df))):
-        rank, frequency, word_foreign, word_transliteration = df.iloc[i]
+    for i in tqdm.tqdm(range(0, min(len(df), args.max_words))):
+        rank, frequency, word, word_description = df.iloc[i]
         save_to = args.save_to / f"{rank:0>5}.json"
         if save_to.exists():
             continue
         query_str = (
-            f'The word "{word_foreign} ({word_transliteration})" is {ordinal(rank)} most used word in {args.name_L2}. ' +
-            'Could you make 10 simple and short example sentences using this word? ' +
-            f'Prefer modern {args.name_L2}, rather than old {args.name_L2}. ' +
-            f'Please provide {args.name_L2} sentences in {args.script_L2}, ' +
-            f'and {args.name_L1} translation in {args.script_L1} as well, in JSON format. ' +
-            f'For example, {{"word": ' +
-                f'{{"{args.code_L1}": "{args.word_L1}", ' +
-                f'"{args.code_L2}": "{args.word_L2}"}}, ' +
-                f'"sentences": [{{"{args.code_L1}": "{args.sentence_L1}",' +
-                f'"{args.code_L2}": "{args.sentence_L2}"}}, ...]}}'
+            f'The word "{word} ({word_description})" is {ordinal(rank)} most used word in {args.name}. ' +
+            f'Make 10 simple and short various example sentences in modern {args.name}, written in {args.script} using this word, in JSON format. ' +
+            f'For example, {{"sentences": ["{args.sentence}", ...]}}'
         )
-        logging.debug(f"LLM: {query_str}")
+        logging.debug(f"LLM Request: {query_str}")
         for _ in range(3):  # max try 3 times
             completion = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-2024-05-13",
                 messages=[
                     {"role": "user", "content": query_str}
-                ]
+                ],
+                response_format={"type": "json_object"},
             )
             reply = completion.choices[0].message.content
+            reply = reply.replace('```json', '').replace('```', '')
             try:
                 _ = json.loads(reply)
                 break
@@ -72,7 +61,10 @@ def main():
         else:
             logging.error(f"Failed to parse JSON after 3 tries: {reply}. Something is wrong.")
             return
-        save_to.write_text(reply)
+        logging.debug(f"LLM Reply: {reply}")
+        reply = json.loads(reply)
+        reply['word'] = word
+        save_to.write_text(json.dumps(reply))
 
 
 if __name__ == '__main__':

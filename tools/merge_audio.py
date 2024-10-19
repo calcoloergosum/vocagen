@@ -1,53 +1,46 @@
 import pathlib
-from pydub import AudioSegment
+
 import tqdm
+import json
+from pydub import AudioSegment
+import hashlib
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument("json", type=pathlib.Path)
     parser.add_argument("audio_root", type=pathlib.Path)
     parser.add_argument("out_root", type=pathlib.Path)
     args = parser.parse_args()
     args.out_root.mkdir(exist_ok=True, parents=True)
 
-    files = sorted(args.audio_root.glob("*.mp3"))
+    s2s = json.loads(args.json.read_text())
+    for s_L2, s_L1 in tqdm.tqdm(sorted(s2s.items())):
+        prefix_L1 = hashlib.sha256(s_L1.encode('utf8')).hexdigest()
+        prefix_L2 = hashlib.sha256(s_L2.encode('utf8')).hexdigest()
 
-    # group files by word, sentence, language code
-    i_word2i_sentence2lang_code2files = {}
-    for f in files:
-        i_word, i_sentence, lang_code, speaker_name = f.stem.split("_")
-        if i_word not in i_word2i_sentence2lang_code2files:
-            i_word2i_sentence2lang_code2files[i_word] = {}
-        if i_sentence not in i_word2i_sentence2lang_code2files[i_word]:
-            i_word2i_sentence2lang_code2files[i_word][i_sentence] = {}
-        if lang_code not in i_word2i_sentence2lang_code2files[i_word][i_sentence]:
-            i_word2i_sentence2lang_code2files[i_word][i_sentence][lang_code] = []
-        i_word2i_sentence2lang_code2files[i_word][i_sentence][lang_code].append(f)
-
-    for i_word, i_sentence2lang_code2files in tqdm.tqdm(sorted(i_word2i_sentence2lang_code2files.items())):
-        save_to = args.out_root / f"{i_word}.mp3"
+        # refer file by L1
+        save_to = args.out_root / f"{prefix_L1}.mp3"
         if save_to.exists():
             continue
+
+        # Identify the audio files
+        audio_l2s = sorted(args.audio_root.glob(f"{prefix_L2}_*.mp3"))
+        audio_l1s = sorted(args.audio_root.glob(f"{prefix_L1}_*.mp3"))
+        assert len(audio_l1s) == 1
+        audio_l1 = audio_l1s[0]
+
         audio = None
-        for i_sentence, lang_code2files in sorted(i_sentence2lang_code2files.items()):
-            langs = list(lang_code2files.keys())
-            langs.remove('en')
-            assert len(langs) == 1
-            other_lang = langs[0]
-            en_files = lang_code2files.get("en", [])
-            if len(en_files) == 0:
-                continue
-            en_file = en_files[0]
-            # speak english, hindi alternatively
-            for hi_file in lang_code2files[other_lang]:
-                audio = AudioSegment.from_file(en_file) if audio is None else (audio + AudioSegment.from_file(en_file))
-                # add 1 second pause in between utterances
-                audio += AudioSegment.silent(duration=1000)
-                audio += AudioSegment.from_file(hi_file)
-                audio += AudioSegment.silent(duration=1000)
-        # add 2 seconds pause after each words
-        audio += AudioSegment.silent(duration=2000)
+        # speak L1, L2 alternatively
+        for f in audio_l2s:
+            audio = AudioSegment.from_file(audio_l1) if audio is None else (audio + AudioSegment.from_file(audio_l1))
+            # add 1 second pause in between utterances
+            audio += AudioSegment.silent(duration=1000)
+            audio += AudioSegment.from_file(f)
+            audio += AudioSegment.silent(duration=1000)
+        # add 5 seconds pause after each words
+        audio += AudioSegment.silent(duration=5000)
         audio.export(save_to, format="mp3")
 
 
