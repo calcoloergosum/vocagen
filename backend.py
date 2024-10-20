@@ -1,11 +1,10 @@
 import flask
 import hashlib
 import warnings
-import flask_cors
 import json
 import pathlib
 import random
-
+import os
 
 
 def format_dict_keys(d):
@@ -55,8 +54,7 @@ L1_2_L2_2images = {
     for l1, l2_2_root in langpair2root.items()
 }
 
-app = flask.Flask(__name__, static_folder='frontend/build/', static_url_path='/')
-flask_cors.CORS(app)
+app = flask.Flask(__name__, static_folder='frontend/build/')
 
 @app.route('/api/getSupportedLanguagePairs')
 def getSupportedLanguages():
@@ -84,6 +82,16 @@ def random_sentence(L1: str, L2: str):
         warnings.warn(f"Found {len(audio_L1s)} audio files for {id_L1}, expected 1.")
     audio_L1 = audio_L1s[0]
 
+    audio_urls = [
+        app.url_for('audio', L1=L1, L2=L2, id=audio_L1.stem),
+        *[
+            app.url_for('audio', L1=L1, L2=L2, id=p.stem)
+            for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
+        ]
+    ]
+    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], filepath_image(L1, L2, id_L1)[1])))
+    audio_urls = [url.strip("/") for url in audio_urls]
+    image_url = image_url.strip("/")
     return flask.jsonify(format_dict_keys({
         "id": id_L2,
         "id_L1": id_L1,
@@ -92,14 +100,8 @@ def random_sentence(L1: str, L2: str):
         "L2": L2,
         "sentence1": s_L1,
         "sentence2": s_L2,
-        "audio_urls": [
-            app.url_for('audio', L1=L1, L2=L2, id=audio_L1.stem),
-            *[
-                app.url_for('audio', L1=L1, L2=L2, id=p.stem)
-                for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
-            ]
-        ],
-        "image_url": app.url_for('image', **dict(zip(["L1", "L2", "id"], filepath_image(L1, L2, id_L1)[1]))),
+        "audio_urls": audio_urls,
+        "image_url": image_url,
     }))
 
 
@@ -129,25 +131,64 @@ def report_issue():
     data = flask.request.json
     # For now, just remove the image
     L1, L2 = data["l1"], data["l2"]
+    reason = data['reason']
 
-    try:
-        filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
-        filepath.unlink()
-        print(f"Removed {filepath.as_posix()}")
-        return "Done"
-    except FileNotFoundError:
-        print(f"File not found {filepath.as_posix()}.")
-        return flask.Response(status=404)
+    match reason:
+        case "image":
+            try:
+                filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
+                filepath.unlink()
+                print(f"Removed {filepath.as_posix()}")
+                return "Done"
+            except FileNotFoundError:
+                print(f"File not found {filepath.as_posix()}.")
+                return flask.Response(status=404)
+        case _:
+            return flask.Response(status=400)
 
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    if path != "" and os.path.exists(app.static_folder + '/' + path):
-        return flask.send_from_directory(app.static_folder, path)
-    else:
-        return flask.send_from_directory(app.static_folder, 'index.html')
+IS_DEVEL = os.environ.get('FLASK_ENV', 'production').lower() == 'development'
+if IS_DEVEL:
+    print("Development setting")
+    import requests
+    API_HOST = "http://localhost:3000/"
 
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve(path):
+        """Proxy to the frontend server."""
+        request = flask.request
+        res = requests.request(  # ref. https://stackoverflow.com/a/36601467/248616
+            method          = request.method,
+            url             = request.url.replace(request.host_url, f'{API_HOST}/').replace("/%PUBLIC_URL%", ""),
+            headers         = {k:v for k,v in request.headers if k.lower() != 'host'}, # exclude 'host' header
+            data            = request.get_data(),
+            cookies         = request.cookies,
+            allow_redirects = False,
+        )
+
+        #region exlcude some keys in :res response
+        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']  #NOTE we here exclude all "hop-by-hop headers" defined by RFC 2616 section 13.5.1 ref. https://www.rfc-editor.org/rfc/rfc2616#section-13.5.1
+        headers          = [
+            (k,v) for k,v in res.raw.headers.items()
+            if k.lower() not in excluded_headers
+        ]
+        #endregion exlcude some keys in :res response
+
+        print(res.content, res.status_code, headers)
+        response = flask.Response(res.content, res.status_code, headers)
+        return response
+else:
+    print("production setting")
+
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve(path):
+        if path != "" and os.path.exists(app.static_folder + '/' + path):
+            return flask.send_from_directory(app.static_folder, path)
+        else:
+            return flask.send_from_directory(app.static_folder, 'index.html')
+    
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    app.run(host='0.0.0.0', port=8001 if IS_DEVEL else 8000)

@@ -1,1 +1,0 @@
-export const get_backend = () => `http://${window.location.host}`;

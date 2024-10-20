@@ -26,7 +26,7 @@ LOGLEVEL=DEBUG python tools/image.py $ROOT/sentences.json $ROOT/image/ \
     --use to \
     --prompt-json assets/comfyui.json \
     --additional-prompt "Cinematic photography in India, from far with intricate details, vibrant color. Young and attractive." \
-    --api "http://192.168.0.9:8188/prompt"
+    --api "http://192.168.0.9:8188"
 
 
 # Merge the audio file so that it is nicer to listen to
