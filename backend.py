@@ -55,7 +55,7 @@ L1_2_L2_2images = {
     for l1, l2_2_root in langpair2root.items()
 }
 
-app = flask.Flask(__name__)
+app = flask.Flask(__name__, static_folder='frontend/build', static_url_path='/')
 flask_cors.CORS(app)
 
 @app.route('/api/getSupportedLanguagePairs')
@@ -138,6 +138,15 @@ def report_issue():
     except FileNotFoundError:
         print(f"File not found {filepath.as_posix()}.")
         return flask.Response(status=404)
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return flask.send_from_directory(app.static_folder, path)
+    else:
+        return flask.send_from_directory(app.static_folder, 'index.html')
 
 
 if __name__ == '__main__':
