@@ -9,7 +9,7 @@ import urllib
 import urllib.request
 from pathlib import Path
 import logging
-
+import itertools
 import tqdm
 
 
@@ -52,14 +52,18 @@ def main():
             resp = json.loads(resp.read().decode('utf-8'))
 
         prompt_id = resp['prompt_id']
-        
-        while True:
+
+        for i in itertools.count():
             try:
                 resp_history = json.loads(urllib.request.urlopen(f"http://192.168.0.9:8188/history/{prompt_id}").read())
                 image_info = next(iter(resp_history[prompt_id]['outputs'].values()))['images'][0]
                 break
             except KeyError:
                 # Prompt is still running. Wait a bit
+                if i > 180:
+                    logging.error(f"Prompt is still running after 180 seconds. Quitting ...")
+                    return
+                print(f"Waiting for the prompt to finish... (retrying {i: >2})\r", end="")
                 time.sleep(1)
                 continue
 
