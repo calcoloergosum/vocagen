@@ -2,6 +2,10 @@ import flask
 import hashlib
 import warnings
 import flask_cors
+import json
+import pathlib
+import random
+
 
 
 def format_dict_keys(d):
@@ -28,10 +32,6 @@ def sentence2id(s):
     return hashlib.sha256(s.encode('utf8')).hexdigest()
 
 
-import json
-import pathlib
-import random
-
 langpair2root = {
     "en": {
         "hi": pathlib.Path("assets/hi"),
@@ -55,7 +55,7 @@ L1_2_L2_2images = {
     for l1, l2_2_root in langpair2root.items()
 }
 
-app = flask.Flask(__name__, static_folder='frontend/build', static_url_path='/')
+app = flask.Flask(__name__, static_folder='frontend/build/', static_url_path='/')
 flask_cors.CORS(app)
 
 @app.route('/api/getSupportedLanguagePairs')

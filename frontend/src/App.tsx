@@ -5,12 +5,6 @@ import React from 'react';
 import logo from './logo.svg';
 import './App.css';
 import { get_backend } from './constants';
-import {
-  BrowserRouter as Router,
-  Route,
-  Routes,
-  Link,
-} from "react-router-dom";
 
 interface Sentence {
   id: string;  // unique identifier
@@ -23,19 +17,18 @@ interface Sentence {
 
 function App() {
   // Select the language pair and redirect to the SentenceViewer
+  const [languagePair, setLanguagePair] = React.useState<{ L1: string, L2: string } | null>(null);
+
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<div>
-          <h1>Choose a language pair</h1>
-          <Link to="/en/hi">Study Hindi using English</Link>
-          <br />
-          <Link to="/en/ko">Study Korean using English</Link>
-        </div>} />
-        <Route path="/en/hi" element={<SentenceViewer L1='en' L2='hi'/>} />
-        <Route path="/en/ko" element={<SentenceViewer L1='en' L2='ko'/>} />
-      </Routes>
-    </Router>
+    languagePair ? <SentenceViewer L1={languagePair.L1} L2={languagePair.L2} /> :
+    <>
+      <p onClick={() => {
+        setLanguagePair({ L1: 'en', L2: 'hi' });
+      }}>Hindi for English speaker</p>
+      <p onClick={() => {
+        setLanguagePair({ L1: 'en', L2: 'ko' });
+      }}>Korean for English speaker</p>
+    </>
   )
 }
 

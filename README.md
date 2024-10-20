@@ -1,6 +1,8 @@
 # VocaGen
 
-This project is currently Work In Progress.
+[Online Demo](voca-gen.com) ... Network bandwidth is limited, please bare with the slowness :)
+
+**This project is currently Work In Progress.**
 
 Example sentence generation, featuring:
 - Audio, Image, example sentences
