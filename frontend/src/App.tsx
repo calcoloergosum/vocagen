@@ -5,6 +5,12 @@ import React from 'react';
 import logo from './logo.svg';
 import './App.css';
 import { BACKEND } from './constants';
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Link,
+} from "react-router-dom";
 
 interface Sentence {
   id: string;  // unique identifier
@@ -16,12 +22,34 @@ interface Sentence {
 
 
 function App() {
+  // Select the language pair and redirect to the SentenceViewer
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<div>
+          <h1>Choose a language pair</h1>
+          <Link to="/en/hi">Study Hindi using English</Link>
+          <br />
+          <Link to="/en/ko">Study Korean using English</Link>
+        </div>} />
+        <Route path="/en/hi" element={<SentenceViewer L1='en' L2='hi'/>} />
+        <Route path="/en/ko" element={<SentenceViewer L1='en' L2='ko'/>} />
+      </Routes>
+    </Router>
+  )
+}
+
+interface SentenceViewerProps {
+  L1: string;
+  L2: string;
+}
+function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
   const [audioIndex, setAudioIndex] = React.useState(0);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
   const updateCurrentSentence = () => {
-    fetch(`${BACKEND}/api/sentence/en/hi/random`)
+    fetch(`${BACKEND}/api/sentence/${L1}/${L2}/random`)
       .then(response => response.json())
       .then(data => {
         setCurrentSentence(data);

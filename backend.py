@@ -35,7 +35,8 @@ import random
 langpair2root = {
     "en": {
         "hi": pathlib.Path("assets/hi"),
-    }
+        "ko": pathlib.Path("assets/ko"),
+    },
 }
 
 L1_2_L2_2sentences = {
@@ -60,7 +61,11 @@ flask_cors.CORS(app)
 @app.route('/api/getSupportedLanguagePairs')
 def getSupportedLanguages():
     return flask.jsonify(format_dict_keys({
-        "pairs": [{"L2": 'hi', "L1": 'en'},]
+        "pairs": [
+            {"L1": L1, "L2": L2}
+            for L1, L2s in langpair2root.keys()
+            for L2 in L2s
+        ]
     }))
 
 
@@ -126,7 +131,7 @@ def report_issue():
     L1, L2 = data["l1"], data["l2"]
 
     try:
-        filepath = langpair2root[L1][L2] / 'image' / f"{pathlib.Path(data["imageUrl"]).stem}.png"
+        filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
         filepath.unlink()
         print(f"Removed {filepath.as_posix()}")
         return "Done"
@@ -136,4 +141,4 @@ def report_issue():
 
 
 if __name__ == '__main__':
-    app.run(port=8000)
+    app.run(host='0.0.0.0', port=8000)

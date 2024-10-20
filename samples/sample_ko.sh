@@ -24,7 +24,7 @@ python tools/tts.py \
 LOGLEVEL=DEBUG python tools/image.py $ROOT/sentences.json $ROOT/image/ \
     --use to \
     --prompt-json assets/comfyui.json \
-    --additional-prompt "Shot taken with cinematic mise-en-scène in Korea, from far with intricate details, vibrant color." \
+    --additional-prompt "Shot taken with cinematic mise-en-scène in Korea, from far with intricate details, vibrant color. Young and attractive." \
     --api "http://192.168.0.9:8188/prompt"
 
 
