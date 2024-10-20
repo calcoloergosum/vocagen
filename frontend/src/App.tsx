@@ -4,7 +4,7 @@
 import React from 'react';
 import logo from './logo.svg';
 import './App.css';
-import { BACKEND } from './constants';
+import { get_backend } from './constants';
 import {
   BrowserRouter as Router,
   Route,
@@ -49,10 +49,13 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
   const updateCurrentSentence = () => {
-    fetch(`${BACKEND}/api/sentence/${L1}/${L2}/random`)
+    fetch(`${get_backend()}/api/sentence/${L1}/${L2}/random`)
       .then(response => response.json())
       .then(data => {
         setCurrentSentence(data);
+      }).catch((e) => {
+        // Show error message in popup
+        alert('Failed to load the sentence: ' + e);
       });
   };
 
@@ -73,11 +76,11 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
       {currentSentence && (
         /* Image in full screen, and overlay the sentence in the middle on top of the image */
         <div>
-          <img src={`${BACKEND}/${currentSentence?.imageUrl}`} alt="Image" style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block"}} />
+          <img src={`${get_backend()}/${currentSentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block"}} />
           {/* Text align center */}
           <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', transform: 'translate(0%, -50%)' }}>
 
-          <audio src={`${BACKEND}/${currentSentence?.audioUrls[audioIndex]}`} controls ref={audioRef} autoPlay onEnded={
+          <audio src={`${get_backend()}/${currentSentence?.audioUrls[audioIndex]}`} controls ref={audioRef} autoPlay onEnded={
               () => {
                 if (audioIndex + 1 >= currentSentence.audioUrls.length) {
                   setAudioIndex(0);
@@ -91,7 +94,7 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
 
             {/* Button to report issues on current sentence */}
             <button onClick={() => {
-              fetch(`${BACKEND}/api/report`, {
+              fetch(`${get_backend()}/api/report`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'

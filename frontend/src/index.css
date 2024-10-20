@@ -30,3 +30,27 @@ code {
     0 0 1em black,
     0 0 0.2em black;
 }
+
+@media screen and (max-device-width: 940px) {
+  body{
+    -webkit-text-size-adjust: 100%;
+  }
+  /* CSS that should be displayed if width is equal to or less than 800px goes here */
+  .sentenceL1 {
+    font-size: 100%;
+    color: white;
+    text-align: center;
+    text-shadow: 1px 1px 2px black,
+      0 0 1em black,
+      0 0 0.2em black;
+  }
+
+  .sentenceL2 {
+    font-size: 250%;
+    color: white;
+    text-align: center;
+    text-shadow: 1px 1px 6px black,
+      0 0 1em black,
+      0 0 0.2em black;
+  }
+}
