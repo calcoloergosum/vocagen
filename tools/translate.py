@@ -30,6 +30,7 @@ def main():
     except FileNotFoundError:
         hi2en = {}
 
+    i_update = 0
     for p in tqdm.tqdm(sorted(args.llm.glob("*.json"))):
         d = json.loads(p.read_text())
         for s in tqdm.tqdm(d['sentences'], leave=False):
@@ -45,9 +46,13 @@ def main():
             # Unescape HTML entities
             text = html.unescape(text)
             hi2en[s] = text
+            i_update += 1
 
+        if i_update % 100 == 0:
             with args.save_to.open("w") as f:
                 json.dump(hi2en, f, indent=2)
+    with args.save_to.open("w") as f:
+        json.dump(hi2en, f, indent=2)
 
 
 if __name__ == "__main__":

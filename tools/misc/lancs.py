@@ -1,8 +1,8 @@
 """Script to convert Lancaster frequency list into the format used in this project."""
 import pathlib
 
-content = pathlib.Path("raw/lancs.txt").read_text()
-lines = [l.split("\t") for l in content.split("\n")][1:]
+content = pathlib.Path("raw/lancs_raw.txt").read_text()
+lines = [l.strip().split("\t") for l in content.split("\n")][1:-1]
 # Line consists of 3 columns
 #     Word = Word type (headword followed by any variant forms) - see pp.4-5
 #     PoS  = Part of speech (grammatical word class - see pp. 12-13)
@@ -11,7 +11,10 @@ lines = [l.split("\t") for l in content.split("\n")][1:]
 pos_interested = ["NoC", "Verb", "Adj", "Adv", "Prep", "Conj", "Pron", "DetP", "Ord", "Det", "VMod", "Noun"]
 
 lines = [l for l in lines if l[1] in pos_interested and len(set('0123456789').intersection(l[0])) == 0]
-content = "rank,frequency,word,pos\n" + '\n'.join([",".join(map(str, [rank, freq, word, pos])) for rank, (word, pos, freq, *_) in enumerate(lines)])
-res = pathlib.Path("assets/en-ja/frequency.csv").write_text(content)
+lines = sorted(lines, key=lambda l: int(l[3]), reverse=True)
+i_start = 10000
+lines = lines[i_start:30000]
+content = "rank,frequency,word,pos\n" + '\n'.join([",".join(map(str, [rank + i_start + 1, freq, word, pos])) for rank, (word, pos, freq, *_) in enumerate(lines)])
+res = pathlib.Path("assets/en/frequency.csv").write_text(content)
 
 print(f"Done! ({res} bytes)")

@@ -26,6 +26,12 @@ function App() {
       <button className="link" onClick={() => {
         setLanguagePair({ L1: 'en', L2: 'ko' });
       }}>Korean for English speaker</button>
+      <button className="link" onClick={() => {
+        setLanguagePair({ L1: 'ja', L2: 'en' });
+      }}>English for Japanese speaker</button>
+      <button className="link" onClick={() => {
+        setLanguagePair({ L1: 'en', L2: 'ja' });
+      }}>Japanese for English speaker</button>
     </>
   )
 }

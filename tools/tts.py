@@ -11,7 +11,7 @@ from google.cloud import texttospeech
 client = texttospeech.TextToSpeechClient()
 audio_config = texttospeech.AudioConfig(
     audio_encoding=texttospeech.AudioEncoding.MP3,
-    speaking_rate=0.8,
+    speaking_rate=1.0,
 )
 
 
