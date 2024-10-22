@@ -58,7 +58,12 @@ L1_2_L2_2images = {
     for l1, l2_2_root in langpair2root.items()
 }
 
-app = flask.Flask(__name__, static_folder='frontend/build/')
+IS_DEVEL = os.environ.get('FLASK_ENV', 'production').lower() == 'development'
+if IS_DEVEL:
+    print("Launching in development mode.")
+    app = flask.Flask(__name__, static_folder='frontend/public')
+else:
+    app = flask.Flask(__name__, static_folder='')
 
 @app.route('/api/getSupportedLanguagePairs')
 def getSupportedLanguages():
@@ -93,7 +98,14 @@ def random_sentence(L1: str, L2: str):
             for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
         ]
     ]
-    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], filepath_image(L1, L2, id_L1)[1])))
+    if L1 == "en":
+        id = id_L1
+    elif L2 == "en":
+        id = id_L2
+    else:
+        raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
+
+    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], filepath_image(L1, L2, id)[1])))
     audio_urls = [url.strip("/") for url in audio_urls]
     image_url = image_url.strip("/")
     return flask.jsonify(format_dict_keys({
@@ -120,10 +132,10 @@ def image(L1: str, L2: str, id: str):
     return flask.send_file(filepath)
 
 
-def filepath_image(L1, L2, idL1):
-    filepath = langpair2root[L1][L2] / 'image' / f"{idL1}.png"
+def filepath_image(L1, L2, id):
+    filepath = langpair2root[L1][L2] / 'image' / f"{id}.png"
     if filepath.exists():
-        return (filepath, (L1, L2, idL1))
+        return (filepath, (L1, L2, id))
     else:
         print(f"File not found {filepath}. Fallback to random image.")
         filepath = random.choice(L1_2_L2_2images[L1][L2])
@@ -151,7 +163,6 @@ def report_issue():
             return flask.Response(status=400)
 
 
-IS_DEVEL = os.environ.get('FLASK_ENV', 'production').lower() == 'development'
 if IS_DEVEL:
     print("Development setting")
     import requests
@@ -164,7 +175,7 @@ if IS_DEVEL:
         request = flask.request
         res = requests.request(  # ref. https://stackoverflow.com/a/36601467/248616
             method          = request.method,
-            url             = request.url.replace(request.host_url, f'{API_HOST}/').replace("/%PUBLIC_URL%", ""),
+            url             = request.url.replace(request.host_url, f'{API_HOST}').replace("/%PUBLIC_URL%", ""),
             headers         = {k:v for k,v in request.headers if k.lower() != 'host'}, # exclude 'host' header
             data            = request.get_data(),
             cookies         = request.cookies,
