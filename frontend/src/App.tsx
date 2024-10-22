@@ -1,7 +1,7 @@
 // The application plays example sentences and shows images of the words in the sentence.
 // Automatically play the next sentence after the current sentence is finished.
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import './App.css';
 import { isVisible } from '@testing-library/user-event/dist/utils';
 
@@ -11,6 +11,7 @@ interface Sentence {
   sentence2: string;  // Sentence in L2
   audioUrls: string[];  // first audio is L1 sentence, the rest is L2 sentence
   imageUrl: string;
+  imageIsRandom: boolean;
 }
 
 
@@ -33,15 +34,18 @@ function App() {
     languagePair ? <SentenceViewer L1={languagePair.L1} L2={languagePair.L2} /> :
       (
         <table>
+          <thead>
           <tr>
             <th>L1</th>
             <th>L2</th>
             <th>Go</th>
           </tr>
+          </thead>
+          <tbody>
           {
             languagePairs.map(
-              (pair) => (
-                <tr>
+              (pair, i) => (
+                <tr key={`lang-pair-${i}`}>
                   <td>{emojiMap[pair.L1]}{pair.L1}</td>
                   <td>{emojiMap[pair.L2]}{pair.L2}</td>
                   <td>
@@ -50,6 +54,7 @@ function App() {
                 </tr>)
             )
           }
+          </tbody>
         </table>
       )
   )
@@ -111,11 +116,10 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
           <img src={`${currentSentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block" }} onClick={playToggle} />
           {/* Text align center */}
           <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', transform: 'translate(0%, -50%)' }} onClick={playToggle}>
-            {/* Play audio */}
-            <AudioPlayer L1={currentSentence.audioUrls[0]} L2s={currentSentence.audioUrls.slice(1)} onEnded={updateCurrentSentence} audioRef={audioRef}/>
-            {/* Button to report issues on current sentence */}
-            {/* <button onClick={() => {
+            <AudioPlayer urls={currentSentence.audioUrls} onEnded={updateCurrentSentence} audioRef={audioRef}/>
+            <button disabled={currentSentence.imageIsRandom} onClick={() => {
               if (!currentSentence) return;
+              if (currentSentence.imageIsRandom) return;
               let report = JSON.parse(JSON.stringify(currentSentence));
               report.reason = "image";
               fetch(`/api/report`, {
@@ -137,7 +141,7 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
               });
             }}>Report Image</button>
 
-            <button onClick={() => {
+            {/* <button onClick={() => {
               if (!currentSentence) return;
               let report = JSON.parse(JSON.stringify(currentSentence));
               report.reason = "sentence";
@@ -163,36 +167,52 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
             <h1 className="sentenceL1">{currentSentence.sentence1}</h1>
             <h1 className="sentenceL2">{currentSentence.sentence2}</h1>
           </div>
+
+          {/* When clicked right 20% of the screen, skip the current sentence */}
+          <div style={{ position: 'absolute', top: '0', left: '80%', right: '0', bottom: '0' }} onClick={updateCurrentSentence}></div>
         </div>
       )}
     </div>
   );
 }
 
-function AudioPlayer({ L1, L2s, onEnded, audioRef }: { L1: string, L2s: string[], onEnded: () => void, audioRef: React.RefObject<HTMLAudioElement> }) {
+// Audio player component
+// First audio is L1 sentence, the rest is L2 sentence
+function AudioPlayer({ urls, onEnded, audioRef }: { urls: string[], onEnded: () => void, audioRef: React.RefObject<HTMLAudioElement> }) {
   const [isL1, setIsL1] = React.useState(true);  // alternate between L1 and L2
-  const [audioIndex, setAudioIndex] = React.useState(0);
+  const [audioIndex, setAudioIndex] = React.useState(1);
+
+  // Reset the audio player when the urls change
+  useEffect(() => {
+    setIsL1(true);
+    setAudioIndex(1);
+  }, urls);
 
   return (
     <div>
-      <audio src={`${isL1? L1 : L2s[audioIndex]}`} controls ref={audioRef} autoPlay
-        onEnded={
-          () => {
-            if (isL1) {
-              setIsL1(false);
-              return;
-            }
-            // play next L2 sentence
-            if (audioIndex + 1 >= L2s.length) {
-              onEnded();
-              setAudioIndex(0);
+      {/* Play audio */}
+      {
+        urls.length >= 2 && (
+          <audio src={`${isL1? urls[0] : urls[audioIndex]}`} controls ref={audioRef} autoPlay
+          onEnded={
+            () => {
+              if (isL1) {
+                setIsL1(false);
+                return;
+              }
+              // play next L2 sentence
+              if (audioIndex + 2 >= urls.length) {
+                onEnded();
+                setAudioIndex(1);
+                setIsL1(true);
+                return;
+              }
               setIsL1(true);
-              return;
+              setAudioIndex(audioIndex + 1);
             }
-            setIsL1(true);
-            setAudioIndex(audioIndex + 1);
-          }
-        } />
+          } />
+        )
+      }
     </div>
   );
 }

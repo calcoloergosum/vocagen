@@ -13,6 +13,18 @@ code {
     monospace;
 }
 
+.button {
+  font-family: Arial;
+  color: #ffffff;
+  text-decoration: none;
+  display: block;
+}
+
+.button:disabled {
+  background: #a0a0a0;
+  text-decoration: none;
+}
+
 .sentenceL1 {
   font-size: 200%;
   color: white;

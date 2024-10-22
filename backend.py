@@ -105,7 +105,8 @@ def random_sentence(L1: str, L2: str):
     else:
         raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
 
-    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], filepath_image(L1, L2, id)[1])))
+    is_success, _, l1l2id = filepath_image(L1, L2, id)
+    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], l1l2id)))
     audio_urls = [url.strip("/") for url in audio_urls]
     image_url = image_url.strip("/")
     return flask.jsonify(format_dict_keys({
@@ -118,6 +119,7 @@ def random_sentence(L1: str, L2: str):
         "sentence2": s_L2,
         "audio_urls": audio_urls,
         "image_url": image_url,
+        "image_is_random": not is_success,
     }))
 
 
@@ -128,18 +130,18 @@ def audio(L1: str, L2: str, id: str):
 
 @app.route("/api/image/<string:L1>/<string:L2>/<string:id>")
 def image(L1: str, L2: str, id: str):
-    filepath, _ = filepath_image(L1, L2, id)
+    _, filepath, _ = filepath_image(L1, L2, id)
     return flask.send_file(filepath)
 
 
 def filepath_image(L1, L2, id):
     filepath = langpair2root[L1][L2] / 'image' / f"{id}.png"
     if filepath.exists():
-        return (filepath, (L1, L2, id))
+        return True, filepath, (L1, L2, id),
     else:
         print(f"File not found {filepath}. Fallback to random image.")
         filepath = random.choice(L1_2_L2_2images[L1][L2])
-        return filepath, (L1, L2, filepath.stem)
+        return False, filepath, (L1, L2, filepath.stem),
 
 
 @app.route("/api/report", methods=["POST"])
