@@ -63,7 +63,7 @@ if IS_DEVEL:
     print("Launching in development mode.")
     app = flask.Flask(__name__, static_folder='frontend/public')
 else:
-    app = flask.Flask(__name__, static_folder='')
+    app = flask.Flask(__name__, static_folder='frontend/build')
 
 @app.route('/api/getSupportedLanguagePairs')
 def getSupportedLanguages():
@@ -153,14 +153,20 @@ def report_issue():
         case "image":
             try:
                 filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
-                filepath.unlink()
-                print(f"Removed {filepath.as_posix()}")
+                with pathlib.Path("reportedImage.txt").open("a") as f:
+                    f.write(f"{filepath.as_posix()}\n")
+                # filepath.unlink()
+                # print(f"Removed {filepath.as_posix()}")
                 return "Done"
             except FileNotFoundError:
                 print(f"File not found {filepath.as_posix()}.")
                 return flask.Response(status=404)
         case _:
-            return flask.Response(status=400)
+            with pathlib.Path("reportedSentence.txt").open("a") as f:
+                f.write(f"{filepath.as_posix()}\n")
+            # filepath.unlink()
+            # print(f"Removed {filepath.as_posix()}")
+            return "Done"
 
 
 if IS_DEVEL:
@@ -190,7 +196,6 @@ if IS_DEVEL:
         ]
         #endregion exlcude some keys in :res response
 
-        print(res.content, res.status_code, headers)
         response = flask.Response(res.content, res.status_code, headers)
         return response
 else:

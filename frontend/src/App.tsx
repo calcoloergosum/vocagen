@@ -3,6 +3,7 @@
 
 import React from 'react';
 import './App.css';
+import { isVisible } from '@testing-library/user-event/dist/utils';
 
 interface Sentence {
   id: string;  // unique identifier
@@ -16,25 +17,44 @@ interface Sentence {
 function App() {
   // Select the language pair and redirect to the SentenceViewer
   const [languagePair, setLanguagePair] = React.useState<{ L1: string, L2: string } | null>(null);
-
+  const languagePairs = [
+    { L1: 'ja', L2: 'en' },
+    { L1: 'en', L2: 'hi' },
+    { L1: 'en', L2: 'ko' },
+    { L1: 'en', L2: 'ja' },
+  ]
+  const emojiMap: { [key: string]: string } = {
+    'en': '🇬🇧',
+    'ja': '🇯🇵',
+    'hi': '🇮🇳',
+    'ko': '🇰🇷'
+  }
   return (
     languagePair ? <SentenceViewer L1={languagePair.L1} L2={languagePair.L2} /> :
-    <>
-      <button className="link" onClick={() => {
-        setLanguagePair({ L1: 'en', L2: 'hi' });
-      }}>Hindi for English speaker</button>
-      <button className="link" onClick={() => {
-        setLanguagePair({ L1: 'en', L2: 'ko' });
-      }}>Korean for English speaker</button>
-      <button className="link" onClick={() => {
-        setLanguagePair({ L1: 'ja', L2: 'en' });
-      }}>English for Japanese speaker</button>
-      <button className="link" onClick={() => {
-        setLanguagePair({ L1: 'en', L2: 'ja' });
-      }}>Japanese for English speaker</button>
-    </>
+      (
+        <table>
+          <tr>
+            <th>L1</th>
+            <th>L2</th>
+            <th>Go</th>
+          </tr>
+          {
+            languagePairs.map(
+              (pair) => (
+                <tr>
+                  <td>{emojiMap[pair.L1]}{pair.L1}</td>
+                  <td>{emojiMap[pair.L2]}{pair.L2}</td>
+                  <td>
+                    <button className="link" onClick={() => { setLanguagePair(pair); }}/>
+                  </td>
+                </tr>)
+            )
+          }
+        </table>
+      )
   )
 }
+
 
 interface SentenceViewerProps {
   L1: string;
@@ -42,52 +62,59 @@ interface SentenceViewerProps {
 }
 function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
-  const [audioIndex, setAudioIndex] = React.useState(0);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
   const updateCurrentSentence = () => {
     const url = `/api/sentence/${L1}/${L2}/random`
     fetch(url)
-    .then((response) => response.json())
-    .then((data) => {
-      setCurrentSentence(data);
-    })
-    .catch((e) => {
+      .then((response) => response.json())
+      .then((data) => {
+        setCurrentSentence(data);
+      })
+      .catch((e) => {
         // Show error message in popup
         alert('Failed to load the sentence: ' + e);
       });
   };
 
-  // Load sentences from the server
   React.useEffect(() => {
+    // Load sentences from the server
     updateCurrentSentence();
     console.log("Loaded sentence");
+
+    // Keyboard event listener
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === " ")
+        playToggle();
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return function cleanup() {
+      document.removeEventListener('keydown', handleKeyDown);
+    }
   }, []);
 
+  const playToggle = () => {
+    if (audioRef.current) {
+      if (audioRef.current.paused) {
+        audioRef.current.play();
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }
   return (
     <div>
       {currentSentence && (
         /* Image in full screen, and overlay the sentence in the middle on top of the image */
         <div>
-          <img src={`${currentSentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block"}} />
+          <img src={`${currentSentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block" }} onClick={playToggle} />
           {/* Text align center */}
-          <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', transform: 'translate(0%, -50%)' }}>
-
-          <audio src={`${currentSentence?.audioUrls[audioIndex]}`} controls ref={audioRef} autoPlay onEnded={
-              () => {
-                if (audioIndex + 1 >= currentSentence.audioUrls.length) {
-                  audioRef.current?.pause();
-                  setAudioIndex(0);
-                  updateCurrentSentence();
-                  return;
-                }
-                audioRef.current?.pause();
-                setAudioIndex(audioIndex + 1);
-              }
-            } />
-
+          <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', transform: 'translate(0%, -50%)' }} onClick={playToggle}>
+            {/* Play audio */}
+            <AudioPlayer L1={currentSentence.audioUrls[0]} L2s={currentSentence.audioUrls.slice(1)} onEnded={updateCurrentSentence} audioRef={audioRef}/>
             {/* Button to report issues on current sentence */}
-            <button onClick={() => {
+            {/* <button onClick={() => {
               if (!currentSentence) return;
               let report = JSON.parse(JSON.stringify(currentSentence));
               report.reason = "image";
@@ -131,13 +158,41 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
                 // Show error message in popup
                 alert('Failed to report the sentence');
               });
-            }}>Report sentence</button>
+            }}>Report sentence</button> */}
 
             <h1 className="sentenceL1">{currentSentence.sentence1}</h1>
             <h1 className="sentenceL2">{currentSentence.sentence2}</h1>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function AudioPlayer({ L1, L2s, onEnded, audioRef }: { L1: string, L2s: string[], onEnded: () => void, audioRef: React.RefObject<HTMLAudioElement> }) {
+  const [isL1, setIsL1] = React.useState(true);  // alternate between L1 and L2
+  const [audioIndex, setAudioIndex] = React.useState(0);
+
+  return (
+    <div>
+      <audio src={`${isL1? L1 : L2s[audioIndex]}`} controls ref={audioRef} autoPlay
+        onEnded={
+          () => {
+            if (isL1) {
+              setIsL1(false);
+              return;
+            }
+            // play next L2 sentence
+            if (audioIndex + 1 >= L2s.length) {
+              onEnded();
+              setAudioIndex(0);
+              setIsL1(true);
+              return;
+            }
+            setIsL1(true);
+            setAudioIndex(audioIndex + 1);
+          }
+        } />
     </div>
   );
 }

@@ -25,7 +25,7 @@ LOGLEVEL=DEBUG python tools/image.py $ROOT/translation_en.json $ROOT/image/ \
     --use to \
     --prompt-json assets/comfyui.json \
     --additional-prompt "Cinematic photography in Japan, from far with intricate details, vibrant color. Young and attractive." \
-    --api "http://localhost:8188/prompt"
+    --api "http://localhost:8188"
 
 
 # Merge the audio file so that it is nicer to listen to
