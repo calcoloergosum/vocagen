@@ -35,12 +35,16 @@ langpair2root = {
     "en": {
         "hi": pathlib.Path("assets/hi"),
         "ko": pathlib.Path("assets/ko"),
+        "ja": pathlib.Path("assets/ja")
     },
+    "ja": {
+        "en": pathlib.Path("assets/en"),
+    }
 }
 
 L1_2_L2_2sentences = {
     l1: {
-        l2: json.loads((root / "sentences.json").read_text())
+        l2: json.loads((root / f"translation_{l1}.json").read_text())
         for l2, root in l2_2_root.items()
     }
     for l1, l2_2_root in langpair2root.items()

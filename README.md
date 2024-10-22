@@ -79,7 +79,7 @@ assets
 │   │   ├── ... (998 more) ...
 │   │   └── 01000.json
 │   ├── frequency.csv
-│   └── sentences.json (Translation of L2 into L1 sentences)
+│   └── translation_en.json (Translation of L2 into L1 sentences)
 ├── ko
 │   ...
 ```
@@ -89,6 +89,7 @@ assets
 - English frequency list is generated from [Lancaster University's frequency lists](https://ucrel.lancs.ac.uk/bncfreq/flists.html).
 - Hindi frequency list is generated from [Wiktionary](https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Hindi_1900) under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - Korean word list is generated from frequecy list of [National Institute of the Korean Language](https://www.korean.go.kr/front/etcData/etcDataView.do?mn_id=46&etc_seq=71).
+- Japanese frequency list is generated from [BCCWJ frequency list](https://clrd.ninjal.ac.jp/bccwj/en/freq-list.html) under their "educational purpose free usage" license.
 - For more details on how it is processed, refer to `tools/misc`.
 
 ## Notes:
