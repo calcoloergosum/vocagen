@@ -52,6 +52,7 @@ def main():
             resp = resp.read()
             with open(save_to, "wb") as f:
                 f.write(resp)
+                print(f"Saved to {save_to}")
 
     s2s = json.loads(args.json.read_text())
     for s_from, s_to in tqdm.tqdm(sorted(s2s.items())):
@@ -68,7 +69,7 @@ def main():
         prompt_text = prompt_text.replace("_FILENAME_PREFIX__REPLACE_", sentence_id)
         prompt_text = prompt_text.replace("_SEED_", str(random.randint(0, 1000000)))
         logging.info(f"Prompt: {text}")
-        logging.debug(f"Raw JSON: {prompt_text}")
+        # logging.debug(f"Raw JSON: {prompt_text}")
 
         req = urllib.request.Request(f"{args.api}/prompt")
         req.add_header('Content-Type', 'application/json; charset=utf-8')

@@ -25,7 +25,7 @@ python tools/tts.py \
 LOGLEVEL=DEBUG python tools/image.py $ROOT/translation_en.json $ROOT/image/ \
     --use to \
     --prompt-json assets/comfyui.json \
-    --additional-prompt "Cinematic photography in India, from far with intricate details, vibrant color. Young and attractive." \
+    --additional-prompt "Cinematic photography (in India:0.5), from far with intricate details, vibrant color. Young and attractive." \
     --api "http://localhost:8188"
 
 
