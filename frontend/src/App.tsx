@@ -3,7 +3,7 @@
 
 import React, { useEffect } from 'react';
 import './App.css';
-import { isVisible } from '@testing-library/user-event/dist/utils';
+import { GoScreenFull, GoScreenNormal, GoReport } from "react-icons/go";
 
 interface Sentence {
   id: string;  // unique identifier
@@ -35,25 +35,25 @@ function App() {
       (
         <table>
           <thead>
-          <tr>
-            <th>L1</th>
-            <th>L2</th>
-            <th>Go</th>
-          </tr>
+            <tr>
+              <th>L1</th>
+              <th>L2</th>
+              <th>Go</th>
+            </tr>
           </thead>
           <tbody>
-          {
-            languagePairs.map(
-              (pair, i) => (
-                <tr key={`lang-pair-${i}`}>
-                  <td>{emojiMap[pair.L1]}{pair.L1}</td>
-                  <td>{emojiMap[pair.L2]}{pair.L2}</td>
-                  <td>
-                    <button className="link" onClick={() => { setLanguagePair(pair); }}/>
-                  </td>
-                </tr>)
-            )
-          }
+            {
+              languagePairs.map(
+                (pair, i) => (
+                  <tr key={`lang-pair-${i}`}>
+                    <td>{emojiMap[pair.L1]}{pair.L1}</td>
+                    <td>{emojiMap[pair.L2]}{pair.L2}</td>
+                    <td>
+                      <button className="link" onClick={() => { setLanguagePair(pair); }} />
+                    </td>
+                  </tr>)
+              )
+            }
           </tbody>
         </table>
       )
@@ -68,6 +68,7 @@ interface SentenceViewerProps {
 function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
   const audioRef = React.useRef<HTMLAudioElement>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
 
   const updateCurrentSentence = () => {
     const url = `/api/sentence/${L1}/${L2}/random`
@@ -102,9 +103,13 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
   const playToggle = () => {
     if (audioRef.current) {
       if (audioRef.current.paused) {
-        audioRef.current.play();
+        audioRef.current.play().catch(() => {
+          // Already playing, or interrupted by another play request.
+          // Do nothing.
+        });
       } else {
         audioRef.current.pause();
+        // Pause raises no error. Do nothing.
       }
     }
   }
@@ -116,12 +121,92 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
           <img src={`${currentSentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block" }} onClick={playToggle} />
           {/* Text align center */}
           <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', transform: 'translate(0%, -50%)' }} onClick={playToggle}>
-            <AudioPlayer urls={currentSentence.audioUrls} onEnded={updateCurrentSentence} audioRef={audioRef}/>
-            <button disabled={currentSentence.imageIsRandom} onClick={() => {
+            <AudioPlayer urls={currentSentence.audioUrls} onEnded={updateCurrentSentence} audioRef={audioRef} />
+            <h1 className="sentenceL1">{currentSentence.sentence1}</h1>
+            <h1 className="sentenceL2">{currentSentence.sentence2}</h1>
+          </div>
+
+          {/* When clicked right 20% of the screen, skip the current sentence */}
+          <div style={{ position: 'absolute', top: '0', left: '80%', right: '0', bottom: '0' }} onClick={updateCurrentSentence}></div>
+
+          {/* Show report button on left bottom */}
+          <div style={{ position: 'absolute', bottom: '0', left: '0', padding: "10px" }}>
+            <ReportComponent {...currentSentence} />
+          </div>
+          {/* Show the full screen icon on the right bottom */}
+          <div style={{ position: 'absolute', bottom: '0', right: '0', padding: "10px" }}>
+            {
+              <button onClick={
+                async () => {
+                  if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().then(() => {
+                      setIsFullscreen(true);
+                    })
+                      .catch((e) => {
+                        // Already in fullscreen mode.
+                        setIsFullscreen(true);
+                      });
+                  } else {
+                    console.log(document.fullscreenElement);
+                    document.exitFullscreen().then(() => {
+                      setIsFullscreen(false);
+                    })
+                      .catch((e) => {
+                        // Already in normal mode.
+                        setIsFullscreen(false);
+                      });
+                  }
+                }
+              }>
+                {isFullscreen ? <GoScreenNormal /> : <GoScreenFull />}
+              </button>
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportComponent(currentSentence: Sentence) {
+  // Pop up a dialog to ask for reason and confirm the report.
+  // Reasons include:
+  // - The sentence is incorrect
+  // - The sentence is inappropriate
+  // - The image is not related to the sentence
+  // - The image is inappropriate
+  const [isReportDialogOpen, setIsReportDialogOpen] = React.useState(false);
+  const reasons = [
+    "The sentence is incorrect",
+    "The sentence is inappropriate",
+    "The image is not related to the sentence",
+    "The image is inappropriate"];
+
+  if (!isReportDialogOpen) {
+    return (
+      <button disabled={currentSentence.imageIsRandom} onClick={() => {
+        if (!currentSentence) return;
+        if (currentSentence.imageIsRandom) return;
+        setIsReportDialogOpen(true);
+      }}>
+        <GoReport />
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <h1>Report</h1>
+      <ul>
+        {reasons.map((reason, i) => (
+          <li key={i}>
+            <button onClick={() => {
+              setIsReportDialogOpen(false);
+
               if (!currentSentence) return;
               if (currentSentence.imageIsRandom) return;
               let report = JSON.parse(JSON.stringify(currentSentence));
-              report.reason = "image";
+              report.reason = reason;
               fetch(`/api/report`, {
                 method: 'POST',
                 headers: {
@@ -139,39 +224,13 @@ function SentenceViewer({ L1, L2 }: SentenceViewerProps) {
                 // Show error message in popup
                 alert('Failed to report the image');
               });
-            }}>Report Image</button>
-
-            {/* <button onClick={() => {
-              if (!currentSentence) return;
-              let report = JSON.parse(JSON.stringify(currentSentence));
-              report.reason = "sentence";
-              fetch(`/api/report`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(report)
-              }).then((resp) => {
-                // Show success message in popup
-                if (resp.status !== 200) {
-                  alert('Failed to report the sentence');
-                  return;
-                }
-                alert('Successfully reported the sentence');
-              }).catch(() => {
-                // Show error message in popup
-                alert('Failed to report the sentence');
-              });
-            }}>Report sentence</button> */}
-
-            <h1 className="sentenceL1">{currentSentence.sentence1}</h1>
-            <h1 className="sentenceL2">{currentSentence.sentence2}</h1>
-          </div>
-
-          {/* When clicked right 20% of the screen, skip the current sentence */}
-          <div style={{ position: 'absolute', top: '0', left: '80%', right: '0', bottom: '0' }} onClick={updateCurrentSentence}></div>
-        </div>
-      )}
+            }}>{reason}</button>
+          </li>
+        ))}
+        <li>
+          <button onClick={() => setIsReportDialogOpen(false)}>Cancel</button>
+        </li>
+      </ul>
     </div>
   );
 }
@@ -189,31 +248,31 @@ function AudioPlayer({ urls, onEnded, audioRef }: { urls: string[], onEnded: () 
   }, urls);
 
   return (
-    <div>
+    <>
       {/* Play audio */}
       {
         urls.length >= 2 && (
-          <audio src={`${isL1? urls[0] : urls[audioIndex]}`} controls ref={audioRef} autoPlay
-          onEnded={
-            () => {
-              if (isL1) {
-                setIsL1(false);
-                return;
-              }
-              // play next L2 sentence
-              if (audioIndex + 2 >= urls.length) {
-                onEnded();
-                setAudioIndex(1);
+          <audio style={{ display: "none", width: "200px" }} src={`${isL1 ? urls[0] : urls[audioIndex]}`} controls ref={audioRef} autoPlay
+            onEnded={
+              () => {
+                if (isL1) {
+                  setIsL1(false);
+                  return;
+                }
+                // play next L2 sentence
+                if (audioIndex + 2 >= urls.length) {
+                  onEnded();
+                  setAudioIndex(1);
+                  setIsL1(true);
+                  return;
+                }
                 setIsL1(true);
-                return;
+                setAudioIndex(audioIndex + 1);
               }
-              setIsL1(true);
-              setAudioIndex(audioIndex + 1);
-            }
-          } />
+            } />
         )
       }
-    </div>
+    </>
   );
 }
 

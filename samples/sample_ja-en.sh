@@ -24,7 +24,7 @@ python tools/tts.py \
 LOGLEVEL=DEBUG python tools/image.py $ROOT/translation_en.json $ROOT/image/ \
     --use to \
     --prompt-json assets/comfyui.json \
-    --additional-prompt "Artistic photography. (Japan:0.2)." \
+    --additional-prompt "Cinematic 4k realistic (in Japan: 0.8). Beautiful and attractive." \
     --api "http://localhost:8188"
 
 

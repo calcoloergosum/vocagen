@@ -67,7 +67,7 @@ def main():
         prompt_text = comfyui_prompt_text
         prompt_text = prompt_text.replace("_PROMPT_TEXT_REPLACE_", f"({text}:1.2), {args.additional_prompt}")
         prompt_text = prompt_text.replace("_FILENAME_PREFIX__REPLACE_", sentence_id)
-        prompt_text = prompt_text.replace("_SEED_", str(random.randint(0, 1000000)))
+        prompt_text = prompt_text.replace("\"_SEED_\"", str(random.randint(0, 1000000)))
         logging.info(f"Prompt: {text}")
         # logging.debug(f"Raw JSON: {prompt_text}")
 

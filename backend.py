@@ -151,24 +151,14 @@ def report_issue():
     L1, L2 = data["l1"], data["l2"]
     reason = data['reason']
 
-    match reason:
-        case "image":
-            try:
-                filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
-                with pathlib.Path("reportedImage.txt").open("a") as f:
-                    f.write(f"{filepath.as_posix()}\n")
-                # filepath.unlink()
-                # print(f"Removed {filepath.as_posix()}")
-                return "Done"
-            except FileNotFoundError:
-                print(f"File not found {filepath.as_posix()}.")
-                return flask.Response(status=404)
-        case _:
-            with pathlib.Path("reportedSentence.txt").open("a") as f:
-                f.write(f"{filepath.as_posix()}\n")
-            # filepath.unlink()
-            # print(f"Removed {filepath.as_posix()}")
-            return "Done"
+    filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
+    if not filepath.exists():
+        print(f"File not found {filepath.as_posix()}.")
+        return flask.Response(status=404)
+
+    with pathlib.Path("reported.txt").open("a") as f:
+        f.write(f"{filepath.as_posix()},{reason}\n")
+    return "Done"
 
 
 if IS_DEVEL:
