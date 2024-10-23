@@ -52,7 +52,7 @@ L1_2_L2_2sentences = {
 
 L1_2_L2_2images = {
     l1: {
-        l2: sorted((root / 'image').glob(f"*.png"))
+        l2: sorted((root / 'image').glob(f"*.png")) + sorted((root / 'image_v2').glob(f"*.png"))
         for l2, root in l2_2_root.items()
     }
     for l1, l2_2_root in langpair2root.items()
@@ -79,9 +79,8 @@ def getSupportedLanguages():
 @app.route('/api/sentence/<string:L1>/<string:L2>/random')
 def random_sentence(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
-    ss_L2_to_L1 = L1_2_L2_2sentences[L1][L2]
-    s_L2 = random.choice(list(ss_L2_to_L1))
-    s_L1 = ss_L2_to_L1[s_L2]
+    s_L2 = random.choice(list(L1_2_L2_2sentences[L1][L2]))
+    s_L1 = L1_2_L2_2sentences[L1][L2][s_L2]
     id_L1 = sentence2id(s_L1)
     id_L2 = sentence2id(s_L2)
     audio_L1s = sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L1}_*.mp3"))
@@ -123,6 +122,70 @@ def random_sentence(L1: str, L2: str):
     }))
 
 
+@app.route('/api/word/<string:L1>/<string:L2>/random')
+def random_word(L1: str, L2: str):
+    """Return random sentence pair from L2 to L1."""
+    for _ in range(10):  # Try 10 times
+        wordfile = random.choice(list((langpair2root[L1][L2] / 'llm').glob("*")))
+        worddata = json.loads(wordfile.read_text())
+        try:
+            return flask.jsonify(format_dict_keys({
+                'sentences': [load_sentence(L1, L2, s_L2) for s_L2 in worddata['sentences']],
+                'word': worddata['word'],
+            }))
+        except FileNotFoundError:
+            # Retry
+            continue
+    raise FileNotFoundError("No valid word found.")
+
+
+def load_sentence(L1: str, L2: str, s_L2: str):
+    try:
+        s_L1 = L1_2_L2_2sentences[L1][L2][s_L2]
+    except KeyError:
+        raise FileNotFoundError(f"Translation for {s_L2} not found.")
+
+    id_L1 = sentence2id(s_L1)
+    id_L2 = sentence2id(s_L2)
+    audio_L1s = sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L1}_*.mp3"))
+    if len(audio_L1s) == 0:
+        raise FileNotFoundError(f"Audio file for {id_L1} not found.")
+    if len(audio_L1s) != 1:
+        warnings.warn(f"Found {len(audio_L1s)} audio files for {id_L1}, expected 1.")
+    audio_L1 = audio_L1s[0]
+
+    audio_urls = [
+        app.url_for('audio', L1=L1, L2=L2, id=audio_L1.stem),
+        *[
+            app.url_for('audio', L1=L1, L2=L2, id=p.stem)
+            for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
+        ]
+    ]
+    if L1 == "en":
+        id = id_L1
+    elif L2 == "en":
+        id = id_L2
+    else:
+        raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
+
+    is_success, _, l1l2id = filepath_image(L1, L2, id)
+    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], l1l2id)))
+    audio_urls = [url.strip("/") for url in audio_urls]
+    image_url = image_url.strip("/")
+    return {
+        "id": id_L2,
+        "id_L1": id_L1,
+        "id_L2": id_L2,
+        "L1": L1,
+        "L2": L2,
+        "sentence1": s_L1,
+        "sentence2": s_L2,
+        "audio_urls": audio_urls,
+        "image_url": image_url,
+        "image_is_random": not is_success,
+    }
+
+
 @app.route('/api/audio/<string:L1>/<string:L2>/<string:id>')
 def audio(L1: str, L2: str, id: str):
     return flask.send_file(langpair2root[L1][L2] / 'audio' / f"{id}.mp3")
@@ -135,6 +198,10 @@ def image(L1: str, L2: str, id: str):
 
 
 def filepath_image(L1, L2, id):
+    filepath = langpair2root[L1][L2] / 'image_v2' / f"{id}.png"
+    if filepath.exists():
+        return True, filepath, (L1, L2, id),
+
     filepath = langpair2root[L1][L2] / 'image' / f"{id}.png"
     if filepath.exists():
         return True, filepath, (L1, L2, id),
