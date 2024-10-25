@@ -1,0 +1,16 @@
+Make me a bedtime story for kid in 10 sentences. Include the word "_WORD_".
+Format the story in JSON with the following format:
+{
+    "title": "Title of the story",
+    "setting": "the situation this story happens",
+    "description": "Brief description of the story",
+    "characters": ["character1", "character2", ...],
+    "keywords": ["word1", "word2", ...],
+    "sentences": [
+        {
+            "text": "the first sentence of the story",
+            "image": "Visual representation of the sentence"
+        },
+        ...
+    ]
+}

@@ -38,8 +38,9 @@ Sample commands can be found in `samples/sample_*.sh`. Step by step:
 2. Sort by frequency. For each word:
 3. Throw it at an LLM to make 10 example sentences. I used OpenAI.
 4. Translate the sentences. I used GCP Translate API. For each sentence:
-5. Make an audio. I used GCP TTS API.
-6. Make an image. I used local ComfyUI API.
+6. Make an audio. I used GCP TTS API.
+7. Make a description of image using LLM. I used OpenAI.
+8. Make an image. I used local ComfyUI server with FLUX.
 
 After everything is done, run frontend by `cd frontend && npm start`. Also, run backend by `python backend.py`.
 
@@ -90,6 +91,7 @@ assets
 - Hindi frequency list is generated from [Wiktionary](https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Hindi_1900) under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - Korean word list is generated from frequecy list of [National Institute of the Korean Language](https://www.korean.go.kr/front/etcData/etcDataView.do?mn_id=46&etc_seq=71).
 - Japanese frequency list is generated from [BCCWJ frequency list](https://clrd.ninjal.ac.jp/bccwj/en/freq-list.html) under their "educational purpose free usage" license.
+- Russian from [OpenSubtitle](https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/ru/ru_50k.txt)
 - For more details on how it is processed, refer to `tools/misc`.
 
 ## Notes:
