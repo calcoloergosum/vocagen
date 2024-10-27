@@ -5,6 +5,7 @@ import React, { useCallback, useEffect } from 'react';
 import './App.css';
 import { GoScreenFull, GoScreenNormal, GoReport } from "react-icons/go";
 import { TiMediaPlayReverse, TiMediaPlay, TiMediaRewind, TiMediaFastForward, TiTimes, TiThList } from "react-icons/ti";
+import { AlternatingAudioPlayer, SequentialAudioPlayer } from './AudioPlayers';
 
 interface Sentence {
   id: string;  // unique identifier
@@ -19,7 +20,8 @@ const emojiMap: { [key: string]: string } = {
   'en': '🇬🇧',
   'ja': '🇯🇵',
   'hi': '🇮🇳',
-  'ko': '🇰🇷'
+  'ko': '🇰🇷',
+  'ru': '🇷🇺',
 }
 
 function App() {
@@ -31,6 +33,7 @@ function App() {
     { L1: 'en', L2: 'hi' },
     { L1: 'en', L2: 'ko' },
     { L1: 'en', L2: 'ja' },
+    { L1: 'en', L2: 'ru' },
   ]
 
   const onExit = useCallback(() => {
@@ -46,7 +49,7 @@ function App() {
       return <SentencePlayer L1={languagePair.L1} L2={languagePair.L2} />
     }
     else if (mode === 'word') {
-      return <WordViewer L1={languagePair.L1} L2={languagePair.L2} onExit={onExit}/>
+      return <SentenceListViewer L1={languagePair.L1} L2={languagePair.L2} onExit={onExit} />
     }
     else {
       // ?? ... Do nothing
@@ -85,12 +88,13 @@ function App() {
 
 
 // Given a word, show 10 example sentences using the word.
-function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => void }) {
-  const [currentWord, setCurrentWord] = React.useState<string | null>(null);
+function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => void }) {
+  const [title, setTitle] = React.useState<string | null>(null);
   const [currentSentenceIndex, setCurrentSentenceIndex] = React.useState(0);
   const [currentTranslation, setCurrentTranslation] = React.useState(L2);
   const [sentences, setSentences] = React.useState<Sentence[]>([]);
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [hideL1, setHideL1] = React.useState(false);
 
   useEffect(() => {
     updateWord();
@@ -119,7 +123,7 @@ function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => 
     fetch(url)
       .then((response) => response.json())
       .then((data) => {
-        setCurrentWord(data.word);
+        setTitle(data.word);
         setSentences(data.sentences);
         setCurrentSentenceIndex(0);
       })
@@ -127,7 +131,7 @@ function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => 
         // Show error message in popup
         alert('Failed to load the word: ' + e);
       });
-  }, [L1, L2, setCurrentWord, setSentences, setCurrentSentenceIndex]);
+  }, [L1, L2, setTitle, setSentences, setCurrentSentenceIndex]);
 
   const updateWordBack = () => {
     // TODO: Implement updateWordBack
@@ -140,7 +144,7 @@ function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => 
       return;
     }
     setCurrentSentenceIndex((pre) => pre + 1);
-  }, [L1, L2, setCurrentWord, setSentences, sentences, currentSentenceIndex, setCurrentSentenceIndex]);
+  }, [L1, L2, setTitle, setSentences, sentences, currentSentenceIndex, setCurrentSentenceIndex]);
 
   const updateSentenceIndexBack = useCallback(() => {
     if (currentSentenceIndex - 1 < 0) {
@@ -159,16 +163,26 @@ function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => 
   // Collapsable, opacity 0.5 when shown.
   return (
     <div>
-      {currentWord && sentences && (
+      {title && sentences && (
         <div>
           <div style={{ position: "absolute", top: 0, left: 0 }}>
-            <SentenceViewer sentence={sentences[currentSentenceIndex]} onEnded={updateSentenceIndex} />
+            <SentenceViewer sentence={sentences[currentSentenceIndex]} hideL1={hideL1} onEnded={updateSentenceIndex} />
+          </div>
+          {/* Toggle button for showing L1 language */}
+          <div style={{ position: "absolute", top: 0, right: 0 }}>
+            <label className="switch">
+              <input type="checkbox" onChange={(e) => {
+                setHideL1(e.target.checked);
+              }} />
+              <span className="slider round"></span>
+            </label>
           </div>
           {
             isCollapsed ?
-              <TiThList onClick={() => setIsCollapsed(!isCollapsed)} style={{ position: "absolute", backgroundColor: "rgba(255, 255, 255, 0.5)" }} /> :
+              <TiThList onClick={() => setIsCollapsed(!isCollapsed)} style={{ position: "absolute", backgroundColor: "rgba(255, 255, 255, 0.5)", height: "100vh" }} /> :
               <div style={{
                 position: 'absolute', width: "20vw", height: "100vh", float: "left", textAlign: "center", backgroundColor: "rgba(255, 255, 255, 0.5)",
+                overflow: "auto",
               }}>
                 <div style={{ position: "absolute", top: 0, right: 0 }}>
                   <TiTimes onClick={() => setIsCollapsed(!isCollapsed)} />
@@ -182,13 +196,13 @@ function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => 
                 <h1>
                   <TiMediaRewind onClick={updateWordBack} />
                   <TiMediaPlayReverse onClick={updateSentenceIndexBack} />
-                  {currentWord}
+                  {title}
                   <TiMediaPlay onClick={updateSentenceIndex} />
                   <TiMediaFastForward onClick={updateWord} />
                 </h1>
                 <ul style={{ listStyleType: "none" }}>
                   {sentences.map((sentence, i) => (
-                    <li key={sentence.id} style={{ cursor: "pointer" }} onClick={() => setCurrentSentenceIndex(i)}>
+                    <li key={i} style={{ cursor: "pointer" }} onClick={() => setCurrentSentenceIndex(i)}>
                       {i === currentSentenceIndex ?
                         <b>{currentTranslation == L1 ? sentence.sentence1 : sentence.sentence2}</b> :
                         currentTranslation == L1 ? sentence.sentence1 : sentence.sentence2}
@@ -203,8 +217,7 @@ function WordViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => 
   );
 }
 
-
-function SentenceViewer({ sentence, onEnded, nRepeat }: { sentence: Sentence, nRepeat?: number, onEnded: () => void }) {
+function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sentence, hideL1: boolean, nRepeat?: number, onEnded: () => void }) {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
@@ -267,10 +280,20 @@ function SentenceViewer({ sentence, onEnded, nRepeat }: { sentence: Sentence, nR
         <div>
           <img src={`${sentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block" }} onClick={playToggle} />
           {/* Text align center */}
-          <div style={{ position: 'absolute', top: '50%', left: '20%', right: '20%', transform: 'translate(0%, -50%)' }} onClick={playToggle}>
-            <AudioPlayer urls={sentence.audioUrls} nRepeat={nRepeat} onEnded={onEnded} audioRef={audioRef} />
-            <h1 className="sentenceL1">{sentence.sentence1}</h1>
-            <h1 className="sentenceL2">{sentence.sentence2}</h1>
+          {/* <div style={{ position: 'absolute', bottom: '0%', left: '20%', right: '20%', transform: 'translate(0%, 0%)' }} onClick={playToggle}> */}
+          <div style={{ position: 'absolute', bottom: '50%', left: '20%', right: '20%', transform: 'translate(0%, 50%)' }} onClick={playToggle}>
+            {
+              hideL1 ?
+                <SequentialAudioPlayer urls={sentence.audioUrls.slice(1)} nRepeat={nRepeat} onEnded={onEnded} audioRef={audioRef} />
+                :
+                <AlternatingAudioPlayer urls={sentence.audioUrls} nRepeat={nRepeat} onEnded={onEnded} audioRef={audioRef} />
+            }
+            <div className="sentences">
+              <h1 className="sentenceL2">{sentence.sentence2}</h1>
+              {
+                hideL1 ? null : <h1 className="sentenceL1">{sentence.sentence1}</h1>
+              }
+            </div>
           </div>
 
           {/* When clicked right 20% of the screen, skip the current sentence */}
@@ -324,7 +347,7 @@ function SentencePlayer({ L1, L2, nRepeat }: SentencePlayerProps) {
 
   return (
     <div>
-      {currentSentence && <SentenceViewer sentence={currentSentence} nRepeat={nRepeat} onEnded={updateCurrentSentence} />}
+      {currentSentence && <SentenceViewer hideL1={false} sentence={currentSentence} nRepeat={nRepeat} onEnded={updateCurrentSentence} />}
     </div>
   );
 }
@@ -345,19 +368,19 @@ function ReportComponent(currentSentence: Sentence) {
 
   if (!isReportDialogOpen) {
     return (
-      <button disabled={currentSentence.imageIsRandom} onClick={() => {
+      <span onClick={() => {
         if (!currentSentence) return;
         if (currentSentence.imageIsRandom) return;
         setIsReportDialogOpen(true);
-      }}>
+      }} style={{ color: (currentSentence.imageIsRandom ? 'red' : 'black') }}>
         <GoReport />
-      </button>
+      </span>
     );
   }
 
   return (
-    <div style={{background: "rgba(255, 255, 255, 0.5)"}}>
-      <h2><GoReport/>&nbsp;&nbsp;&nbsp;Report</h2>
+    <div style={{ background: "rgba(255, 255, 255, 0.5)" }}>
+      <h2><GoReport />&nbsp;&nbsp;&nbsp;Report</h2>
       <ul style={{ listStyleType: "none" }}>
         {reasons.map((reason, i) => (
           <li key={i}>
@@ -391,51 +414,6 @@ function ReportComponent(currentSentence: Sentence) {
         </li>
       </ul>
     </div>
-  );
-}
-
-// Audio player component
-// First audio is L1 sentence, the rest is L2 sentence
-// ref is passed for controlling the audio player
-function AudioPlayer({ urls, nRepeat, onEnded, audioRef }: { urls: string[], nRepeat?: number, onEnded: () => void, audioRef: React.RefObject<HTMLAudioElement> }) {
-  const [isL1, setIsL1] = React.useState(true);  // alternate between L1 and L2
-  const [audioIndexL2, setAudioIndexL2] = React.useState(0);
-  const [L1audio, ...L2audios] = urls;
-
-  // Reset the audio player when the urls change
-  useEffect(() => {
-    setIsL1(true);
-    setAudioIndexL2(0);
-  }, urls);
-
-  return (
-    <>
-      {/* Play audio */}
-      {
-        <audio ref={audioRef}
-          style={{ display: "none", width: "200px" }}
-          src={`${isL1 ? L1audio : L2audios[audioIndexL2 % L2audios.length]}`}
-          controls
-          autoPlay
-          onEnded={
-            () => {
-              if (isL1) {
-                setIsL1(false);
-                return;
-              }
-              // play next L2 sentence
-              if (audioIndexL2 + 1 >= (nRepeat || 3)) {
-                onEnded();
-                setAudioIndexL2(0);
-                setIsL1(true);
-                return;
-              }
-              setIsL1(true);
-              setAudioIndexL2(audioIndexL2 + 1);
-            }
-          } />
-      }
-    </>
   );
 }
 

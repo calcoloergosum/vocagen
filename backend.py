@@ -1,10 +1,12 @@
-import flask
 import hashlib
-import warnings
 import json
+import logging
+import os
 import pathlib
 import random
-import os
+import warnings
+
+import flask
 
 
 def format_dict_keys(d):
@@ -35,7 +37,8 @@ langpair2root = {
     "en": {
         "hi": pathlib.Path("assets/hi"),
         "ko": pathlib.Path("assets/ko"),
-        "ja": pathlib.Path("assets/ja")
+        "ja": pathlib.Path("assets/ja"),
+        "ru": pathlib.Path("assets/ru"),
     },
     "ja": {
         "en": pathlib.Path("assets/en"),
@@ -125,7 +128,7 @@ def random_sentence(L1: str, L2: str):
 @app.route('/api/word/<string:L1>/<string:L2>/random')
 def random_word(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
-    for _ in range(10):  # Try 10 times
+    for i_try in range(10):  # Try 10 times
         wordfile = random.choice(list((langpair2root[L1][L2] / 'llm').glob("*")))
         worddata = json.loads(wordfile.read_text())
         try:
@@ -134,7 +137,7 @@ def random_word(L1: str, L2: str):
                 'word': worddata['word'],
             }))
         except FileNotFoundError:
-            # Retry
+            logging.warning("Failed to load %s. Retry (%s).", wordfile, i_try)
             continue
     raise FileNotFoundError("No valid word found.")
 
@@ -173,7 +176,6 @@ def load_sentence(L1: str, L2: str, s_L2: str):
     audio_urls = [url.strip("/") for url in audio_urls]
     image_url = image_url.strip("/")
     return {
-        "id": id_L2,
         "id_L1": id_L1,
         "id_L2": id_L2,
         "L1": L1,
@@ -188,7 +190,9 @@ def load_sentence(L1: str, L2: str, s_L2: str):
 
 @app.route('/api/audio/<string:L1>/<string:L2>/<string:id>')
 def audio(L1: str, L2: str, id: str):
-    return flask.send_file(langpair2root[L1][L2] / 'audio' / f"{id}.mp3")
+    return flask.send_from_directory(
+        langpair2root[L1][L2] / 'audio', f"{id}.mp3",
+        mimetype="audio/mp3", conditional=True)
 
 
 @app.route("/api/image/<string:L1>/<string:L2>/<string:id>")
