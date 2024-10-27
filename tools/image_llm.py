@@ -2,14 +2,16 @@
 """Using google text to speech API to generate audio files for the words"""
 import argparse
 import hashlib
+import itertools
 import json
+import logging
 import random
 import time
 import urllib
 import urllib.request
 from pathlib import Path
-import logging
-import itertools
+
+import tqdm
 
 
 def main():
@@ -18,6 +20,7 @@ def main():
     parser.add_argument("out_root", type=Path)
     parser.add_argument("--api", type=str, required=True, help="ComfyUI host URL")
     parser.add_argument("--prompt-json", type=Path, required=True, help="Prompt JSON file for ComfyUI")
+    parser.add_argument("--additional-prompt", type=str, help="Additional prompt string")
     args = parser.parse_args()
 
     comfyui_prompt_json = json.dumps({"prompt": json.loads(args.prompt_json.read_text())})
@@ -55,7 +58,7 @@ def main():
 
     for file in sorted(args.prompt_root.glob("*.json")):
         content = json.loads(file.read_text())
-        prompt_text = ', '.join(f"({k}:1.2)" for k in content['keywords']) + ". " + content['description']
+        prompt_text = ', '.join(content['keywords']) + ". " + content['description']
         text_raw = content['sentence']
         sentence_id = hashlib.sha256(text_raw.encode('utf8')).hexdigest()
 
@@ -65,7 +68,7 @@ def main():
 
         # Generate image from comfyui
         prompt_json = comfyui_prompt_json
-        prompt_json = prompt_json.replace("_PROMPT_TEXT_REPLACE_", prompt_text)
+        prompt_json = prompt_json.replace("_PROMPT_TEXT_REPLACE_", prompt_text + ("" if args.additional_prompt is None else (" " + args.additional_prompt)))
         prompt_json = prompt_json.replace("_FILENAME_PREFIX__REPLACE_", sentence_id)
         prompt_json = prompt_json.replace("\"_SEED_\"", str(random.randint(0, 1000000)))
         # logging.debug(f"Raw JSON: {prompt_json}")
@@ -85,7 +88,7 @@ def main():
 
     while queue:
         retrieve(*queue.pop(0))
-        
+
 
 if __name__ == '__main__':
     import os

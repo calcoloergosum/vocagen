@@ -2,14 +2,15 @@
 """Using google text to speech API to generate audio files for the words"""
 import argparse
 import hashlib
+import itertools
 import json
+import logging
 import random
 import time
 import urllib
 import urllib.request
 from pathlib import Path
-import logging
-import itertools
+
 import tqdm
 
 

@@ -1,8 +1,8 @@
 import argparse
+import html
 import json
 import pathlib
 from os import environ
-import html
 
 import tqdm
 from google.cloud import translate

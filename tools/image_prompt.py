@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 import json
 import logging
 from pathlib import Path
@@ -13,7 +12,12 @@ def main():
     parser.add_argument("json", type=Path)
     parser.add_argument("out_root", type=Path)
     parser.add_argument("--use", choices=['from', 'to'])
+    parser.add_argument("--additional-prompt", type=str, default="", help="Additional prompt to add to the text")
+    parser.add_argument("--api", type=str, required=True, help="ComfyUI host URL")
+    parser.add_argument("--prompt-json", type=Path, required=True, help="Prompt JSON file for ComfyUI")
     args = parser.parse_args()
+
+    comfyui_prompt_text = json.dumps({"prompt": json.loads(args.prompt_json.read_text())})
 
     args.out_root.mkdir(parents=True, exist_ok=True)
 
@@ -21,20 +25,19 @@ def main():
 
     s2s = json.loads(args.json.read_text())
     for s_from, s_to in tqdm.tqdm(sorted(s2s.items())):
-        text = s_from if args.use == 'from' else s_to
+        text = args.use == 'from' and s_from or s_to
         sentence_id = hashlib.sha256(text.encode('utf8')).hexdigest()
-
+        
         save_to = args.out_root / f"{sentence_id}.json"
-
         if save_to.exists():
             continue
 
         query_str = (
             f'Imagine a picture representing a sentence "{text}". ' +
-            'what is happening in the picture? ' +
-            'Describe with imagery alone without using any text, in 3 keywords and 1 key sentences. ' +
-            'Format in JSON with format `{{"keywords": ["word1", "word2", "word3"], "description": "key sentence"}}`'
+            f'Describe what is happening in the picture in 3 keywords and 1 key sentences.' +
+            f'Format in JSON with format `{{"keywords": ["word1", "word2", "word3"], "description": "key sentence"}}`'
         )
+        logging.debug(f"LLM Request: {query_str}")
         for _ in range(3):  # max try 3 times
             completion = client.chat.completions.create(
                 model="gpt-4o-2024-05-13",
@@ -49,12 +52,12 @@ def main():
                 _ = json.loads(reply)
                 break
             except json.decoder.JSONDecodeError:
-                logging.info("Trying again after failing to parse JSON: %s", reply)
+                logging.info(f"Trying again after failing to parse JSON: {reply}")
                 continue
         else:
-            logging.error("Failed to parse JSON after 3 tries: %s. Something is wrong.", reply)
+            logging.error(f"Failed to parse JSON after 3 tries: {reply}. Something is wrong.")
             return
-        logging.debug("LLM Reply: %s", reply)
+        logging.debug(f"LLM Reply: {reply}")
         reply = json.loads(reply)
         reply['sentence'] = text
         save_to.write_text(json.dumps(reply))

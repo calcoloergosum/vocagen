@@ -1,9 +1,9 @@
+import hashlib
+import json
 import pathlib
 
 import tqdm
-import json
 from pydub import AudioSegment
-import hashlib
 
 
 def main():

@@ -1,6 +1,6 @@
 """Script to convert BCCWJ frequency list into the format used in this project."""
-import pathlib
 import operator
+import pathlib
 
 content = pathlib.Path("raw/bccwj.tsv").read_text()
 lines = content.split('\n')[1:-1][1000:2000]

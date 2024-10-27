@@ -1,13 +1,13 @@
 import argparse
+import hashlib
 import json
 import logging
+import pathlib
 from pathlib import Path
 
 import pandas as pd
-import hashlib
 import tqdm
 from openai import OpenAI
-import pathlib
 
 
 def main():
