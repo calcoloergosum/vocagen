@@ -95,9 +95,10 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
   const [sentences, setSentences] = React.useState<Sentence[]>([]);
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [hideL1, setHideL1] = React.useState(false);
+  const [randomState, setRandomState] = React.useState(0);
 
   useEffect(() => {
-    updateWord();
+    updateWord(null, "next");
   }, []);
 
   useEffect(() => {
@@ -118,41 +119,43 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
     }
   }, [setIsCollapsed, onExit]);
 
-  const updateWord = useCallback(() => {
-    const url = `/api/word/${L1}/${L2}/random`
+  const updateWord = useCallback((state: number | null, action: 'next' | 'prev') => {
+    const url = (
+      state?
+      `/api/word/${L1}/${L2}/random?seed=${state}&action=${action}`:
+      `/api/word/${L1}/${L2}/random?action=${action}`
+    )
+    console.log(url);
     fetch(url)
       .then((response) => response.json())
       .then((data) => {
         setTitle(data.word);
         setSentences(data.sentences);
         setCurrentSentenceIndex(0);
+        setRandomState(data.state);
+        console.log(data.state);
       })
       .catch((e) => {
         // Show error message in popup
         alert('Failed to load the word: ' + e);
       });
-  }, [L1, L2, setTitle, setSentences, setCurrentSentenceIndex]);
-
-  const updateWordBack = () => {
-    // TODO: Implement updateWordBack
-    updateWord();
-  }
+  }, [L1, L2, setTitle, setSentences, setCurrentSentenceIndex, setRandomState]);
 
   const updateSentenceIndex = useCallback(() => {
     if (currentSentenceIndex + 1 >= sentences.length) {
-      updateWord();
+      updateWord(randomState, 'next');
       return;
     }
     setCurrentSentenceIndex((pre) => pre + 1);
-  }, [L1, L2, setTitle, setSentences, sentences, currentSentenceIndex, setCurrentSentenceIndex]);
+  }, [updateWord, currentSentenceIndex, setCurrentSentenceIndex, sentences, randomState]);
 
   const updateSentenceIndexBack = useCallback(() => {
     if (currentSentenceIndex - 1 < 0) {
-      updateWordBack();
+      updateWord(randomState, 'prev');
       return;
     }
     setCurrentSentenceIndex((pre) => pre - 1);
-  }, [currentSentenceIndex, setCurrentSentenceIndex]);
+  }, [currentSentenceIndex, setCurrentSentenceIndex, randomState]);
 
   // Overlay left 20% of the screen shows the word and sentence list
   // on top of the image (SentenceViewer).
@@ -166,7 +169,9 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
       {title && sentences && (
         <div>
           <div style={{ position: "absolute", top: 0, left: 0 }}>
-            <SentenceViewer sentence={sentences[currentSentenceIndex]} hideL1={hideL1} onEnded={updateSentenceIndex} />
+            <SentenceViewer sentence={sentences[currentSentenceIndex]} hideL1={hideL1}
+            onPreviousRequest={updateSentenceIndexBack}
+            onNextRequest={updateSentenceIndex} />
           </div>
           {/* Toggle button for showing L1 language */}
           <div style={{ position: "absolute", top: 0, right: 0 }}>
@@ -194,11 +199,11 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
                 </h1>
                 {/* Show the word and list of sentences */}
                 <h1>
-                  <TiMediaRewind onClick={updateWordBack} />
+                  <TiMediaRewind onClick={() => updateWord(randomState, "prev")} />
                   <TiMediaPlayReverse onClick={updateSentenceIndexBack} />
                   {title}
                   <TiMediaPlay onClick={updateSentenceIndex} />
-                  <TiMediaFastForward onClick={updateWord} />
+                  <TiMediaFastForward onClick={() => updateWord(randomState, "next")} />
                 </h1>
                 <ul style={{ listStyleType: "none" }}>
                   {sentences.map((sentence, i) => (
@@ -217,7 +222,10 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
   );
 }
 
-function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sentence, hideL1: boolean, nRepeat?: number, onEnded: () => void }) {
+function SentenceViewer({ sentence, onPreviousRequest, onNextRequest, hideL1, nRepeat }:
+  { sentence: Sentence, hideL1: boolean, nRepeat?: number, onNextRequest: () => void,
+    onPreviousRequest: () => void
+  }) {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
 
@@ -227,7 +235,9 @@ function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sent
       if (e.key === " ")
         playToggle();
       else if (e.key === "ArrowRight")
-        onEnded();
+        onNextRequest();
+      else if (e.key === "ArrowLeft")
+        onPreviousRequest();
       else if (e.key === "f")
         toggleFullscreen();
       else console.log(e.key);
@@ -237,7 +247,7 @@ function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sent
     return function cleanup() {
       document.removeEventListener('keydown', handleKeyDown);
     }
-  }, [onEnded]);
+  }, [onNextRequest]);
 
   const playToggle = () => {
     if (audioRef.current) {
@@ -284,9 +294,9 @@ function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sent
           <div style={{ position: 'absolute', bottom: '50%', left: '20%', right: '20%', transform: 'translate(0%, 50%)' }} onClick={playToggle}>
             {
               hideL1 ?
-                <SequentialAudioPlayer urls={sentence.audioUrls.slice(1)} nRepeat={nRepeat} onEnded={onEnded} audioRef={audioRef} />
+                <SequentialAudioPlayer urls={sentence.audioUrls.slice(1)} nRepeat={nRepeat} onEnded={onNextRequest} audioRef={audioRef} />
                 :
-                <AlternatingAudioPlayer urls={sentence.audioUrls} nRepeat={nRepeat} onEnded={onEnded} audioRef={audioRef} />
+                <AlternatingAudioPlayer urls={sentence.audioUrls} nRepeat={nRepeat} onEnded={onNextRequest} audioRef={audioRef} />
             }
             <div className="sentences">
               <h1 className="sentenceL2">{sentence.sentence2}</h1>
@@ -297,7 +307,7 @@ function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sent
           </div>
 
           {/* When clicked right 20% of the screen, skip the current sentence */}
-          <div style={{ position: 'absolute', top: '0', left: '80%', right: '0', bottom: '0' }} onClick={onEnded}></div>
+          <div style={{ position: 'absolute', top: '0', left: '80%', right: '0', bottom: '0' }} onClick={onNextRequest}></div>
 
           {/* Show report button on left bottom */}
           <div style={{ position: 'absolute', bottom: '0', left: '0', padding: "10px", zIndex: 1000 }}>
@@ -317,12 +327,12 @@ function SentenceViewer({ sentence, onEnded, hideL1, nRepeat }: { sentence: Sent
   );
 }
 
-
 interface SentencePlayerProps {
   L1: string;
   L2: string;
   nRepeat?: number;
 }
+
 function SentencePlayer({ L1, L2, nRepeat }: SentencePlayerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
 
@@ -347,7 +357,9 @@ function SentencePlayer({ L1, L2, nRepeat }: SentencePlayerProps) {
 
   return (
     <div>
-      {currentSentence && <SentenceViewer hideL1={false} sentence={currentSentence} nRepeat={nRepeat} onEnded={updateCurrentSentence} />}
+      {currentSentence && <SentenceViewer hideL1={false} sentence={currentSentence} nRepeat={nRepeat}
+      onPreviousRequest={updateCurrentSentence}
+      onNextRequest={updateCurrentSentence} />}
     </div>
   );
 }

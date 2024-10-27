@@ -8,6 +8,8 @@ import warnings
 
 import flask
 
+import vocagen
+
 
 def format_dict_keys(d):
     """Converts dict keys from snake_case to camelCase."""
@@ -52,7 +54,13 @@ L1_2_L2_2sentences = {
     }
     for l1, l2_2_root in langpair2root.items()
 }
-
+L1_2_L2_2words = {
+    l1: {
+        l2: sorted((root / 'llm').glob("*"))
+        for l2, root in l2_2_root.items()
+    }
+    for l1, l2_2_root in langpair2root.items()
+}
 L1_2_L2_2images = {
     l1: {
         l2: sorted((root / 'image').glob(f"*.png")) + sorted((root / 'image_v2').glob(f"*.png"))
@@ -128,13 +136,27 @@ def random_sentence(L1: str, L2: str):
 @app.route('/api/word/<string:L1>/<string:L2>/random')
 def random_word(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
+    try:
+        s = int(flask.request.args.get('seed', None), 16)
+    except ValueError:
+        logging.warning("Wrong value. Use random seed.")
+        s = random.getrandbits(64)
+    except TypeError:
+        logging.warning("Wrong type. Use random seed.")
+        s = random.getrandbits(64)
+    rlcg = vocagen.ReversibleRandom(s)
+    action = flask.request.args.get('action', 'next')
+
     for i_try in range(10):  # Try 10 times
-        wordfile = random.choice(list((langpair2root[L1][L2] / 'llm').glob("*")))
+        files = L1_2_L2_2words[L1][L2]
+        v = rlcg.next() if action == 'next' else rlcg.prev()
+        wordfile = files[int(v % len(files))]
         worddata = json.loads(wordfile.read_text())
         try:
             return flask.jsonify(format_dict_keys({
                 'sentences': [load_sentence(L1, L2, s_L2) for s_L2 in worddata['sentences']],
                 'word': worddata['word'],
+                'state': hex(v)[2:],
             }))
         except FileNotFoundError:
             logging.warning("Failed to load %s. Retry (%s).", wordfile, i_try)
@@ -271,7 +293,7 @@ else:
             return flask.send_from_directory(app.static_folder, path)
         else:
             return flask.send_from_directory(app.static_folder, 'index.html')
-    
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001 if IS_DEVEL else 8000)
