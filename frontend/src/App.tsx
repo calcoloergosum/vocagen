@@ -73,10 +73,10 @@ function App() {
                 <td>{emojiMap[pair.L1]}{pair.L1}</td>
                 <td>{emojiMap[pair.L2]}{pair.L2}</td>
                 <td>
-                  <button className="link" onClick={() => { setLanguagePair(pair); setMode('sentence'); }} />
+                  <button className="link" onClick={() => { setLanguagePair(pair); setMode('sentence'); }}>O</button>
                 </td>
                 <td>
-                  <button className="link" onClick={() => { setLanguagePair(pair); setMode('word'); }} />
+                  <button className="link" onClick={() => { setLanguagePair(pair); setMode('word'); }}>O</button>
                 </td>
               </tr>)
           )

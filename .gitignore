@@ -1,5 +1,5 @@
-assets/*/*/**
-assets/*/translation*.json
+assets/*/*/*/**
+assets/*/*/translation*.json
 **/*.pyc
 
 .DS_Store

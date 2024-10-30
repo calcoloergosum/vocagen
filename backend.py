@@ -37,13 +37,13 @@ def sentence2id(s):
 
 langpair2root = {
     "en": {
-        "hi": pathlib.Path("assets/hi"),
-        "ko": pathlib.Path("assets/ko"),
-        "ja": pathlib.Path("assets/ja"),
-        "ru": pathlib.Path("assets/ru"),
+        "hi": pathlib.Path("assets/en/hi"),
+        "ko": pathlib.Path("assets/en/ko"),
+        "ja": pathlib.Path("assets/en/ja"),
+        "ru": pathlib.Path("assets/en/ru"),
     },
     "ja": {
-        "en": pathlib.Path("assets/en"),
+        "en": pathlib.Path("assets/ja/en"),
     }
 }
 
@@ -102,9 +102,9 @@ def random_sentence(L1: str, L2: str):
     audio_L1 = audio_L1s[0]
 
     audio_urls = [
-        app.url_for('audio', L1=L1, L2=L2, id=audio_L1.stem),
+        app.url_for('audio', L1=L1, L2=L2, filename=audio_L1.name),
         *[
-            app.url_for('audio', L1=L1, L2=L2, id=p.stem)
+            app.url_for('audio', L1=L1, L2=L2, filename=p.name)
             for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
         ]
     ]
@@ -115,8 +115,8 @@ def random_sentence(L1: str, L2: str):
     else:
         raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
 
-    is_success, _, l1l2id = filepath_image(L1, L2, id)
-    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], l1l2id)))
+    is_success, _, l1l2filename = filepath_image(L1, L2, f"{id}.png")
+    image_url = app.url_for('image', **dict(zip(["L1", "L2", "filename"], l1l2filename)))
     audio_urls = [url.strip("/") for url in audio_urls]
     image_url = image_url.strip("/")
     return flask.jsonify(format_dict_keys({
@@ -180,9 +180,9 @@ def load_sentence(L1: str, L2: str, s_L2: str):
     audio_L1 = audio_L1s[0]
 
     audio_urls = [
-        app.url_for('audio', L1=L1, L2=L2, id=audio_L1.stem),
+        app.url_for('audio', L1=L1, L2=L2, filename=audio_L1.name),
         *[
-            app.url_for('audio', L1=L1, L2=L2, id=p.stem)
+            app.url_for('audio', L1=L1, L2=L2, filename=p.name)
             for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
         ]
     ]
@@ -193,8 +193,8 @@ def load_sentence(L1: str, L2: str, s_L2: str):
     else:
         raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
 
-    is_success, _, l1l2id = filepath_image(L1, L2, id)
-    image_url = app.url_for('image', **dict(zip(["L1", "L2", "id"], l1l2id)))
+    is_success, _, l1l2filename = filepath_image(L1, L2, f"{id}.png")
+    image_url = app.url_for('image', **dict(zip(["L1", "L2", "filename"], l1l2filename)))
     audio_urls = [url.strip("/") for url in audio_urls]
     image_url = image_url.strip("/")
     return {
@@ -210,31 +210,27 @@ def load_sentence(L1: str, L2: str, s_L2: str):
     }
 
 
-@app.route('/api/audio/<string:L1>/<string:L2>/<string:id>')
-def audio(L1: str, L2: str, id: str):
+@app.route('/assets/<string:L1>/<string:L2>/audio/<string:filename>')
+def audio(L1: str, L2: str, filename: str):
     return flask.send_from_directory(
-        langpair2root[L1][L2] / 'audio', f"{id}.mp3",
+        langpair2root[L1][L2] / 'audio', filename,
         mimetype="audio/mp3", conditional=True)
 
 
-@app.route("/api/image/<string:L1>/<string:L2>/<string:id>")
-def image(L1: str, L2: str, id: str):
-    _, filepath, _ = filepath_image(L1, L2, id)
+@app.route("/assets/<string:L1>/<string:L2>/image/<string:filename>")
+def image(L1: str, L2: str, filename: str):
+    _, filepath, _ = filepath_image(L1, L2, filename)
     return flask.send_file(filepath)
 
 
-def filepath_image(L1, L2, id):
-    filepath = langpair2root[L1][L2] / 'image_v2' / f"{id}.png"
+def filepath_image(L1, L2, filename: str):
+    filepath = langpair2root[L1][L2] / 'image' / filename
     if filepath.exists():
-        return True, filepath, (L1, L2, id),
-
-    filepath = langpair2root[L1][L2] / 'image' / f"{id}.png"
-    if filepath.exists():
-        return True, filepath, (L1, L2, id),
+        return True, filepath, (L1, L2, filename),
     else:
         print(f"File not found {filepath}. Fallback to random image.")
         filepath = random.choice(L1_2_L2_2images[L1][L2])
-        return False, filepath, (L1, L2, filepath.stem),
+        return False, filepath, (L1, L2, filename),
 
 
 @app.route("/api/report", methods=["POST"])
@@ -295,5 +291,10 @@ else:
             return flask.send_from_directory(app.static_folder, 'index.html')
 
 
+@app.route('/health')
+def health() -> str:
+    return 'OK'
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8001 if IS_DEVEL else 8000)
+    app.run(host='0.0.0.0', port=8001 if IS_DEVEL else 8002)
