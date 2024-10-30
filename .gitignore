@@ -1,5 +1,7 @@
 assets/*/*/*/**
 assets/*/*/translation*.json
+assets/*/*/sentences.json
 **/*.pyc
 
 .DS_Store
+reported.txt
