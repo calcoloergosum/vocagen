@@ -7,8 +7,10 @@ import random
 import warnings
 
 import flask
-
+import flask_login
 import vocagen
+from .types import User
+from . import dbutils
 
 
 def format_dict_keys(d):
@@ -75,6 +77,11 @@ if IS_DEVEL:
     app = flask.Flask(__name__, static_folder='frontend/public')
 else:
     app = flask.Flask(__name__, static_folder='frontend/build')
+app.secret_key = pathlib.Path("secret_key.txt").read_text().strip()
+login_manager = flask_login.LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
 
 @app.route('/api/getSupportedLanguagePairs')
 def getSupportedLanguages():
@@ -90,52 +97,21 @@ def getSupportedLanguages():
 @app.route('/api/sentence/<string:L1>/<string:L2>/random')
 def random_sentence(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
+    # Update user statistics
+    if flask_login.current_user:
+        dbutils.update_user_statistics(flask_login.current_user,
+                                    {"per_language_pair": {L1: {L2: {"n_sentences": 1}}}})
+    # Update user statistics done
+
     s_L2 = random.choice(list(L1_2_L2_2sentences[L1][L2]))
-    s_L1 = L1_2_L2_2sentences[L1][L2][s_L2]
-    id_L1 = sentence2id(s_L1)
-    id_L2 = sentence2id(s_L2)
-    audio_L1s = sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L1}_*.mp3"))
-    if len(audio_L1s) == 0:
-        raise FileNotFoundError(f"Audio file for {id_L1} not found.")
-    if len(audio_L1s) != 1:
-        warnings.warn(f"Found {len(audio_L1s)} audio files for {id_L1}, expected 1.")
-    audio_L1 = audio_L1s[0]
-
-    audio_urls = [
-        app.url_for('audio', L1=L1, L2=L2, filename=audio_L1.name),
-        *[
-            app.url_for('audio', L1=L1, L2=L2, filename=p.name)
-            for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
-        ]
-    ]
-    if L1 == "en":
-        id = id_L1
-    elif L2 == "en":
-        id = id_L2
-    else:
-        raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
-
-    is_success, _, l1l2filename = filepath_image(L1, L2, f"{id}.png")
-    image_url = app.url_for('image', **dict(zip(["L1", "L2", "filename"], l1l2filename)))
-    audio_urls = [url.strip("/") for url in audio_urls]
-    image_url = image_url.strip("/")
-    return flask.jsonify(format_dict_keys({
-        "id": id_L2,
-        "id_L1": id_L1,
-        "id_L2": id_L2,
-        "L1": L1,
-        "L2": L2,
-        "sentence1": s_L1,
-        "sentence2": s_L2,
-        "audio_urls": audio_urls,
-        "image_url": image_url,
-        "image_is_random": not is_success,
-    }))
+    data = load_sentence(L1, L2, s_L2)
+    return flask.jsonify(format_dict_keys(data))
 
 
 @app.route('/api/word/<string:L1>/<string:L2>/random')
 def random_word(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
+    # Update user statistics
     try:
         s = int(flask.request.args.get('seed', None), 16)
     except ValueError:
@@ -152,6 +128,13 @@ def random_word(L1: str, L2: str):
         v = rlcg.next() if action == 'next' else rlcg.prev()
         wordfile = files[int(v % len(files))]
         worddata = json.loads(wordfile.read_text())
+
+        # Update user statistics
+        if flask_login.current_user:
+            dbutils.update_user_statistics(flask_login.current_user,
+                                        {"per_language_pair": {L1: {L2: {"n_sentences": len(worddata['sentences'])}}}})
+        # Update user statistics done
+        
         try:
             return flask.jsonify(format_dict_keys({
                 'sentences': [load_sentence(L1, L2, s_L2) for s_L2 in worddata['sentences']],
@@ -195,8 +178,8 @@ def load_sentence(L1: str, L2: str, s_L2: str):
 
     is_success, _, l1l2filename = filepath_image(L1, L2, f"{id}.png")
     image_url = app.url_for('image', **dict(zip(["L1", "L2", "filename"], l1l2filename)))
-    audio_urls = [url.strip("/") for url in audio_urls]
-    image_url = image_url.strip("/")
+    # audio_urls = [url.strip("/") for url in audio_urls]
+    # image_url = image_url.strip("/")
     return {
         "id_L1": id_L1,
         "id_L2": id_L2,
@@ -209,18 +192,44 @@ def load_sentence(L1: str, L2: str, s_L2: str):
         "image_is_random": not is_success,
     }
 
-
-@app.route('/assets/<string:L1>/<string:L2>/audio/<string:filename>')
-def audio(L1: str, L2: str, filename: str):
-    return flask.send_from_directory(
-        langpair2root[L1][L2] / 'audio', filename,
-        mimetype="audio/mp3", conditional=True)
-
-
 @app.route("/assets/<string:L1>/<string:L2>/image/<string:filename>")
 def image(L1: str, L2: str, filename: str):
     _, filepath, _ = filepath_image(L1, L2, filename)
-    return flask.send_file(filepath)
+    return flask.send_file(filepath.absolute(), mimetype='image/png')
+
+
+@login_manager.user_loader
+def load_user(email):
+    return User(email)
+
+
+@app.route('/api/statistics')
+def statistics():
+    if flask_login.current_user:
+        return flask.jsonify(format_dict_keys(dbutils.get_user_statistics(flask_login.current_user).to_dict()))
+    return flask.redirect(flask.url_for('login'))
+
+
+@app.route('/api/login', methods=["POST"])
+def login():
+    # TODO: Implement encryption of hashed password.
+    uid = flask.request.json['email']
+    password = flask.request.json['password']
+    if (user := dbutils.verify_and_get_user(uid, password)):
+        if user is None:
+            return flask.Response(status=401)
+        flask_login.login_user(user)
+    return flask.jsonify({"email": uid})
+
+
+@app.route('/api/register', methods=["POST"])
+def register():
+    uid = flask.request.json['email']
+    password = flask.request.json['password']
+    if (user := dbutils.register_credentials(uid, password)):
+        flask_login.login_user(user)
+        return 'OK'
+    return flask.Response(status=400)
 
 
 def filepath_image(L1, L2, filename: str):
@@ -245,10 +254,25 @@ def report_issue():
         print(f"File not found {filepath.as_posix()}.")
         return flask.Response(status=404)
 
+    if flask_login.current_user:
+        dbutils.update_user_statistics(flask_login.current_user, {"n_reports": 1})
+        email = flask_login.current_user.email
+    else:
+        email = 'anonymous'
+
     with pathlib.Path("reported.txt").open("a") as f:
-        f.write(f"{filepath.as_posix()},{reason}\n")
+        f.write(f"{email} {filepath.as_posix()},{reason}\n")
     return "Done"
 
+
+if IS_DEVEL:
+    @app.route('/assets/<string:L1>/<string:L2>/audio/<string:filename>')
+    def audio(L1: str, L2: str, filename: str):
+        return flask.send_from_directory(
+            (langpair2root[L1][L2] / 'audio').absolute(), filename,
+            mimetype="audio/mp3", conditional=True)
+
+    # In production, nginx should serve the static files.
 
 if IS_DEVEL:
     print("Development setting")

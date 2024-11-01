@@ -14,6 +14,7 @@ export function AlternatingAudioPlayer({ urls, nRepeat, onEnded, audioRef }: { u
         audioRef.current?.load();
     }, urls);
 
+    console.log(`${whichAudio.isL1 ? L1audio : L2audios[whichAudio.audioIndexL2 % L2audios.length]}`);
     return (
         <>
             {/* Play audio */}

@@ -6,6 +6,9 @@ import './App.css';
 import { GoScreenFull, GoScreenNormal, GoReport } from "react-icons/go";
 import { TiMediaPlayReverse, TiMediaPlay, TiMediaRewind, TiMediaFastForward, TiTimes, TiThList } from "react-icons/ti";
 import { AlternatingAudioPlayer, SequentialAudioPlayer } from './AudioPlayers';
+import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import { hash } from 'bcryptjs';
+
 
 interface Sentence {
   id: string;  // unique identifier
@@ -25,70 +28,232 @@ const emojiMap: { [key: string]: string } = {
 }
 
 function App() {
-  // Select the language pair and redirect to the SentenceViewer
-  const [languagePair, setLanguagePair] = React.useState<{ L1: string, L2: string } | null>(null);
-  const [mode, setMode] = React.useState('sentence');
-  const languagePairs = [
-    { L1: 'ja', L2: 'en' },
-    { L1: 'en', L2: 'hi' },
-    { L1: 'en', L2: 'ko' },
-    { L1: 'en', L2: 'ja' },
-    { L1: 'en', L2: 'ru' },
-  ]
-
-  const onExit = useCallback(() => {
-    setLanguagePair(null);
-    setMode('');  // Reset the mode
-  }, [setLanguagePair, setMode]);
-
-  if (languagePair) {
-    if (!mode) {
-      // Not selected yet. Do nothing.
-    }
-    else if (mode === 'sentence') {
-      return <SentencePlayer L1={languagePair.L1} L2={languagePair.L2} />
-    }
-    else if (mode === 'word') {
-      return <SentenceListViewer L1={languagePair.L1} L2={languagePair.L2} onExit={onExit} />
-    }
-    else {
-      // ?? ... Do nothing
-    }
-  }
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>L1</th>
-          <th>L2</th>
-          <th>Sentences</th>
-          <th>Words</th>
-        </tr>
-      </thead>
-      <tbody>
-        {
-          languagePairs.map(
-            (pair, i) => (
-              <tr key={`lang-pair-${i}`}>
-                <td>{emojiMap[pair.L1]}{pair.L1}</td>
-                <td>{emojiMap[pair.L2]}{pair.L2}</td>
-                <td>
-                  <button className="link" onClick={() => { setLanguagePair(pair); setMode('sentence'); }}>O</button>
-                </td>
-                <td>
-                  <button className="link" onClick={() => { setLanguagePair(pair); setMode('word'); }}>O</button>
-                </td>
-              </tr>)
-          )
-        }
-      </tbody>
-    </table>
+    <Routes>
+      <Route path="/" element={<MainPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/statistics" element={<StatisticsPage />} />
+      {LANGUAGE_PAIRS.map((pair, i) => (
+        <Route key={`sentence-${i}`} path={`/sentence/${pair.L1}/${pair.L2}`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} />} />
+      ))}
+      {LANGUAGE_PAIRS.map((pair, i) => (
+        <Route key={`sentence-${i}`} path={`/word/${pair.L1}/${pair.L2}`} element={<SentenceListViewer L1={pair.L1} L2={pair.L2} />} />
+      ))}
+    </Routes>
   )
 }
 
 
+const LANGUAGE_PAIRS = [
+  { L1: 'ja', L2: 'en' },
+  { L1: 'en', L2: 'hi' },
+  { L1: 'en', L2: 'ko' },
+  { L1: 'en', L2: 'ja' },
+  { L1: 'en', L2: 'ru' },
+]
+
+
+function MainPage() {
+  // Select the language pair and redirect to the SentenceViewer
+  return (
+    <>
+      <table>
+        <thead>
+          <tr>
+            <th>L1</th>
+            <th>L2</th>
+            <th>Sentences</th>
+            <th>Words</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            LANGUAGE_PAIRS.map(
+              (pair, i) => (
+                <tr key={`lang-pair-${i}`}>
+                  <td>{emojiMap[pair.L1]}{pair.L1}</td>
+                  <td>{emojiMap[pair.L2]}{pair.L2}</td>
+                  <td>
+                    <Link to={`/sentence/${pair.L1}/${pair.L2}`}>O</Link>
+                  </td>
+                  <td>
+                    <Link to={`/word/${pair.L1}/${pair.L2}`}>O</Link>
+                  </td>
+                </tr>)
+            )
+          }
+        </tbody>
+      </table>
+      <Link to="/statistics">Statistics</Link>
+    </>
+  )
+}
+
+
+function LoginPage() {
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+
+  const handleLogin = useCallback(() => {
+    if (email === "" || password === "") {
+      alert('Email and password cannot be empty');
+      return;
+    }
+    const hashed = hash('voca-gen.com' + email + password, 10);
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: hashed })
+    }).then((resp) => {
+      if (resp.status !== 200) {
+        alert('Failed to login');
+        return;
+      }
+      alert('Successfully logged in');
+    }).catch(() => {
+      // Show error message in popup
+      alert('Failed to login');
+    });
+  }, [email, password]);
+
+  return (
+    <>
+      <h1>Login</h1>
+      <input type="text" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <br />
+      <input type="password" placeholder="Password" value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => { e.key === "Enter" && handleLogin(); }} />
+      <br />
+      <button onClick={handleLogin}>Login</button>
+      <br />
+      <Link to="/register">Don't have an account? Register</Link>
+    </>
+  );
+};
+
+
+function RegisterPage() {
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const navigate = useNavigate();
+
+  const handleRegister = useCallback(() => {
+    if (email === "" || password === "") {
+      alert('Email and password cannot be empty');
+      return;
+    }
+    const hashed = hash('voca-gen.com' + email + password, 10);
+    fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: hashed })
+    }).then((resp) => {
+      if (resp.status !== 200) {
+        alert('Failed to register');
+        return;
+      }
+      alert('Successfully registered');
+      navigate("/");
+    }).catch(() => {
+      // Show error message in popup
+      alert('Failed to register');
+    });
+  }, [email, password]);
+
+  return (
+    <>
+      <h1>Register</h1>
+      <input type="text" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <br />
+      <input type="password" placeholder="Password" value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => { e.key === "Enter" && handleRegister(); }} />
+      <br />
+      <button onClick={handleRegister}>Register</button>
+    </>
+  );
+};
+
+
+interface Statistics {
+  email: string;
+  nReports: number;
+  perLanguagePair: { string: { string: LanguagePairStatistics } };
+  achievements: string[];
+}
+
+interface LanguagePairStatistics {
+  L1: string;
+  L2: string;
+  totalSeconds: number;
+  totalSentences: number;
+}
+
+function StatisticsPage() {
+  const [statistics, setStatistics] = React.useState<Statistics | null>(null);
+  const navigate = useNavigate();
+
+  // Redirect to login page, alert of show statistics
+  useEffect(() => {
+    fetch('/api/statistics')
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("statistics", data);
+        setStatistics(data);
+      })
+      .catch((e) => {
+        // Show error message in popup
+        alert('Failed to load statistics: ' + e);
+        navigate("/login");
+      });
+  }, [navigate]);
+
+  return (
+    statistics && (
+      <>
+        <h1>Statistics</h1>
+        <h2>Contribution</h2>
+        <table>
+          <tbody>
+            <tr>
+              <td>Reports</td>
+              <td>{statistics.nReports}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Study</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>L1</th>
+              <th>L2</th>
+              <th>Total Sentences</th>
+              <th>Total Seconds</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(statistics.perLanguagePair).map(
+              ([L1, _d], i) => (
+                Object.entries(_d).map(([L2, value], j) => (
+                  <tr key={`statistics-${i}-${j}`}>
+                    <td>{L1}</td>
+                    <td>{L2}</td>
+                    <td>{value.totalSentences}</td>
+                    <td>{value.totalSeconds}</td>
+                  </tr>
+                ))))}
+          </tbody>
+        </table>
+      </>
+    )
+  );
+}
+
 // Given a word, show 10 example sentences using the word.
-function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit: () => void }) {
+function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit?: () => void }) {
   const [title, setTitle] = React.useState<string | null>(null);
   const [currentSentenceIndex, setCurrentSentenceIndex] = React.useState(0);
   const [currentTranslation, setCurrentTranslation] = React.useState(L2);
@@ -109,7 +274,7 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
         e.preventDefault();
       }
       if (e.key === "Escape") {
-        onExit();
+        if (onExit) onExit();
       }
     }
 
@@ -121,9 +286,9 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
 
   const updateWord = useCallback((state: number | null, action: 'next' | 'prev') => {
     const url = (
-      state?
-      `/api/word/${L1}/${L2}/random?seed=${state}&action=${action}`:
-      `/api/word/${L1}/${L2}/random?action=${action}`
+      state ?
+        `/api/word/${L1}/${L2}/random?seed=${state}&action=${action}` :
+        `/api/word/${L1}/${L2}/random?action=${action}`
     )
     console.log(url);
     fetch(url)
@@ -170,8 +335,8 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
         <div>
           <div style={{ position: "absolute", top: 0, left: 0 }}>
             <SentenceViewer sentence={sentences[currentSentenceIndex]} hideL1={hideL1}
-            onPreviousRequest={updateSentenceIndexBack}
-            onNextRequest={updateSentenceIndex} />
+              onPreviousRequest={updateSentenceIndexBack}
+              onNextRequest={updateSentenceIndex} />
           </div>
           {/* Toggle button for showing L1 language */}
           <div style={{ position: "absolute", top: 0, right: 0 }}>
@@ -223,7 +388,8 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
 }
 
 function SentenceViewer({ sentence, onPreviousRequest, onNextRequest, hideL1, nRepeat }:
-  { sentence: Sentence, hideL1: boolean, nRepeat?: number, onNextRequest: () => void,
+  {
+    sentence: Sentence, hideL1: boolean, nRepeat?: number, onNextRequest: () => void,
     onPreviousRequest: () => void
   }) {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -358,8 +524,8 @@ function SentencePlayer({ L1, L2, nRepeat }: SentencePlayerProps) {
   return (
     <div>
       {currentSentence && <SentenceViewer hideL1={false} sentence={currentSentence} nRepeat={nRepeat}
-      onPreviousRequest={updateCurrentSentence}
-      onNextRequest={updateCurrentSentence} />}
+        onPreviousRequest={updateCurrentSentence}
+        onNextRequest={updateCurrentSentence} />}
     </div>
   );
 }
