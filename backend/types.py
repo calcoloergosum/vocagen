@@ -27,8 +27,8 @@ class LanguagePairStatistics:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "LanguagePairStatistics":
-        return cls(d["L1"], d["L2"], d["total_seconds"], d["n_sentences"])
+    def from_dict(cls, d: dict, L1: str, L2: str) -> "LanguagePairStatistics":
+        return cls(d.get("L1", L1), d.get("L2", L2), d.get("total_seconds", 0), d.get("n_sentences", 0))
 
 
 @dataclasses.dataclass
@@ -52,4 +52,4 @@ class Statistics:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Statistics":
-        return cls(d["email"], d["n_reports"], {k: {k2: LanguagePairStatistics.from_dict(v2) for k2, v2 in v.items()} for k, v in d["per_language_pair"].items()}, d["achievements"])
+        return cls(d["email"], d["n_reports"], {k: {k2: LanguagePairStatistics.from_dict(v2, k, k2) for k2, v2 in v.items()} for k, v in d["per_language_pair"].items()}, d["achievements"])

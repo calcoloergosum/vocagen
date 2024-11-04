@@ -2,7 +2,7 @@
 import pathlib
 from .types import User, LanguagePairStatistics, Statistics
 import json
-
+ANONYMOUS_ID = 'anonymous'
 
 def verify_and_get_user(uid, password):
     try:
@@ -26,14 +26,20 @@ def register_credentials(uid: str, password: str) -> bool:
     return User(uid)
 
 def _get_user_statistics_file(user: User) -> pathlib.Path:
-    fileid = user.email.replace("@", ",")  # As "," is not allowed in email
+    try:
+        fileid = user.email.replace("@", ",")  # As "," is not allowed in email
+    except:
+        fileid = ANONYMOUS_ID
     return pathlib.Path(f"userdb/{fileid}.json")
 
 def get_user_statistics(user: User) -> Statistics:
     try:
         return Statistics.from_dict(json.loads(_get_user_statistics_file(user).read_text()))
     except FileNotFoundError:
-        return Statistics.new(user.email)
+        if isinstance(user, User):
+            return Statistics.new(user.email)
+        else:
+            return Statistics.new(ANONYMOUS_ID)
 
 def update_user_statistics(user: User, data: dict):
     stat = get_user_statistics(user).to_dict()

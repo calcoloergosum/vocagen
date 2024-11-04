@@ -6,7 +6,7 @@ import './App.css';
 import { GoScreenFull, GoScreenNormal, GoReport } from "react-icons/go";
 import { TiMediaPlayReverse, TiMediaPlay, TiMediaRewind, TiMediaFastForward, TiTimes, TiThList } from "react-icons/ti";
 import { AlternatingAudioPlayer, SequentialAudioPlayer } from './AudioPlayers';
-import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { hash } from 'bcryptjs';
 
 
@@ -35,7 +35,11 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/statistics" element={<StatisticsPage />} />
       {LANGUAGE_PAIRS.map((pair, i) => (
-        <Route key={`sentence-${i}`} path={`/sentence/${pair.L1}/${pair.L2}`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} />} />
+        <>
+          <Route key={`sentence-${i}-random`} path={`/sentence/${pair.L1}/${pair.L2}/random`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='random' />} />
+          <Route key={`sentence-${i}-length`} path={`/sentence/${pair.L1}/${pair.L2}/length`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='length' />} />
+          <Route key={`sentence-${i}-length`} path={`/sentence/${pair.L1}/${pair.L2}/length/:n`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='length' />} />
+          </>
       ))}
       {LANGUAGE_PAIRS.map((pair, i) => (
         <Route key={`sentence-${i}`} path={`/word/${pair.L1}/${pair.L2}`} element={<SentenceListViewer L1={pair.L1} L2={pair.L2} />} />
@@ -75,7 +79,8 @@ function MainPage() {
                   <td>{emojiMap[pair.L1]}{pair.L1}</td>
                   <td>{emojiMap[pair.L2]}{pair.L2}</td>
                   <td>
-                    <Link to={`/sentence/${pair.L1}/${pair.L2}`}>O</Link>
+                    <Link to={`/sentence/${pair.L1}/${pair.L2}/random`}>O</Link>
+                    <Link to={`/sentence/${pair.L1}/${pair.L2}/length`}>O</Link>
                   </td>
                   <td>
                     <Link to={`/word/${pair.L1}/${pair.L2}`}>O</Link>
@@ -188,7 +193,7 @@ interface LanguagePairStatistics {
   L1: string;
   L2: string;
   totalSeconds: number;
-  totalSentences: number;
+  nSentences: number;
 }
 
 function StatisticsPage() {
@@ -241,7 +246,7 @@ function StatisticsPage() {
                   <tr key={`statistics-${i}-${j}`}>
                     <td>{L1}</td>
                     <td>{L2}</td>
-                    <td>{value.totalSentences}</td>
+                    <td>{value.nSentences}</td>
                     <td>{value.totalSeconds}</td>
                   </tr>
                 ))))}
@@ -456,7 +461,6 @@ function SentenceViewer({ sentence, onPreviousRequest, onNextRequest, hideL1, nR
         <div>
           <img src={`${sentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block" }} onClick={playToggle} />
           {/* Text align center */}
-          {/* <div style={{ position: 'absolute', bottom: '0%', left: '20%', right: '20%', transform: 'translate(0%, 0%)' }} onClick={playToggle}> */}
           <div style={{ position: 'absolute', bottom: '50%', left: '20%', right: '20%', transform: 'translate(0%, 50%)' }} onClick={playToggle}>
             {
               hideL1 ?
@@ -497,10 +501,13 @@ interface SentencePlayerProps {
   L1: string;
   L2: string;
   nRepeat?: number;
+  mode: 'random' | 'length';
 }
 
-function SentencePlayer({ L1, L2, nRepeat }: SentencePlayerProps) {
+function SentencePlayer({ L1, L2, nRepeat, mode }: SentencePlayerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
+  const {n} = useParams();
+  const [randomState, setRandomState] = React.useState(n || 0);
 
   React.useEffect(() => {
     // Load sentences from the server
@@ -509,24 +516,43 @@ function SentencePlayer({ L1, L2, nRepeat }: SentencePlayerProps) {
 
   const updateCurrentSentence = useCallback(
     () => {
-      const url = `/api/sentence/${L1}/${L2}/random`
-      fetch(url)
-        .then((response) => response.json())
-        .then((data) => {
-          setCurrentSentence(data);
-        })
-        .catch((e) => {
-          // Show error message in popup
-          alert('Failed to load the sentence: ' + e);
-        });
-    }, [setCurrentSentence]);
+      if (mode === 'random') {
+        const url = `/api/sentence/${L1}/${L2}/random?seed=${randomState}&action=next`
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            setCurrentSentence(data.sentence);
+            setRandomState(data.state);
+          })
+          .catch((e) => {
+            // Show error message in popup
+            alert('Failed to load the sentence: ' + e);
+          });
+      } else {
+        const url = `/api/sentence/${L1}/${L2}/length?seed=${randomState}&action=next`
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            console.log(randomState, data.state);
+            setCurrentSentence(data.sentence);
+            setRandomState(data.state);
+          })
+          .catch((e) => {
+            // Show error message in popup
+            alert('Failed to load the sentence: ' + e);
+          });
+      }
+    }, [setCurrentSentence, setRandomState, L1, L2, randomState, mode]);
 
   return (
-    <div>
-      {currentSentence && <SentenceViewer hideL1={false} sentence={currentSentence} nRepeat={nRepeat}
-        onPreviousRequest={updateCurrentSentence}
-        onNextRequest={updateCurrentSentence} />}
-    </div>
+    <>
+      <div>
+        {currentSentence && <SentenceViewer hideL1={false}
+          sentence={currentSentence} nRepeat={nRepeat}
+          onPreviousRequest={updateCurrentSentence}
+          onNextRequest={updateCurrentSentence} />}
+      </div>
+    </>
   );
 }
 

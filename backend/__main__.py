@@ -56,6 +56,14 @@ L1_2_L2_2sentences = {
     }
     for l1, l2_2_root in langpair2root.items()
 }
+L1_2_L2_2sentences_keys = {
+    l1: {
+        l2: sorted(L1_2_L2_2sentences[l1][l2].keys(), key=lambda x: (len(x), x))
+        for l2 in L1_2_L2_2sentences[l1]
+    }
+    for l1 in L1_2_L2_2sentences
+}
+
 L1_2_L2_2words = {
     l1: {
         l2: sorted((root / 'llm').glob("*"))
@@ -102,16 +110,61 @@ def random_sentence(L1: str, L2: str):
         dbutils.update_user_statistics(flask_login.current_user,
                                     {"per_language_pair": {L1: {L2: {"n_sentences": 1}}}})
     # Update user statistics done
+    
+    # update seed
+    try:
+        s = int(flask.request.args.get('seed', '0'), 16)
+    except ValueError:
+        logging.warning("Wrong value. Use random seed.")
+        s = random.getrandbits(64)
+    except TypeError:
+        logging.warning("Wrong type. Use random seed.")
+        s = random.getrandbits(64)
+    rlcg = vocagen.ReversibleRandom(s)
+    action = flask.request.args.get('action', 'next')
+    v = rlcg.next() if action == 'next' else rlcg.prev()
 
-    s_L2 = random.choice(list(L1_2_L2_2sentences[L1][L2]))
-    data = load_sentence(L1, L2, s_L2)
-    return flask.jsonify(format_dict_keys(data))
+    s_L2 = L1_2_L2_2sentences_keys[L1][L2][int(v % len(L1_2_L2_2sentences[L1][L2]))]
+    sentence = load_sentence(L1, L2, s_L2)
+    return flask.jsonify(format_dict_keys({
+        'sentence': sentence,
+        'state': hex(v)[2:],
+    }))
+
+
+@app.route('/api/sentence/<string:L1>/<string:L2>/length')
+def length_sorted_sentence(L1: str, L2: str):
+    """Return n'th longest sentence pair."""
+    # Update user statistics
+    if flask_login.current_user:
+        dbutils.update_user_statistics(flask_login.current_user,
+                                    {"per_language_pair": {L1: {L2: {"n_sentences": 1}}}})
+    # Update user statistics done
+
+    # update seed
+    try:
+        s = int(flask.request.args.get('seed', '0'), 16)
+    except ValueError:
+        logging.warning("Wrong value. Use random seed.")
+        s = random.getrandbits(64)
+    except TypeError:
+        logging.warning("Wrong type. Use random seed.")
+        s = random.getrandbits(64)
+    action = flask.request.args.get('action', 'next')
+    v = s + 1 if action == 'next' else s - 1
+
+    L1_2_L2_2sentences_keys[L1][L2][int(s % len(L1_2_L2_2sentences[L1][L2]))]
+    s_L2 = L1_2_L2_2sentences_keys[L1][L2][int(s % len(L1_2_L2_2sentences[L1][L2]))]
+    sentence = load_sentence(L1, L2, s_L2)
+    return flask.jsonify(format_dict_keys({
+        'sentence': sentence,
+        'state': hex(v)[2:],
+    }))
 
 
 @app.route('/api/word/<string:L1>/<string:L2>/random')
 def random_word(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
-    # Update user statistics
     try:
         s = int(flask.request.args.get('seed', None), 16)
     except ValueError:
@@ -134,7 +187,7 @@ def random_word(L1: str, L2: str):
             dbutils.update_user_statistics(flask_login.current_user,
                                         {"per_language_pair": {L1: {L2: {"n_sentences": len(worddata['sentences'])}}}})
         # Update user statistics done
-        
+
         try:
             return flask.jsonify(format_dict_keys({
                 'sentences': [load_sentence(L1, L2, s_L2) for s_L2 in worddata['sentences']],
