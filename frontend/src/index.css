@@ -73,3 +73,22 @@ code {
       0 0 0.2em black;
   }
 }
+
+/* Image */
+@media (orientation: portrait) {
+  img.image-vertical {
+    display: block;
+  }
+  img.image-horizontal {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) {
+  img.image-vertical {
+    display: none;
+  }
+  img.image-horizontal {
+    display: block;
+  }
+}

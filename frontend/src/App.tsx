@@ -15,7 +15,8 @@ interface Sentence {
   sentence1: string;  // Sentence in L1
   sentence2: string;  // Sentence in L2
   audioUrls: string[];  // first audio is L1 sentence, the rest is L2 sentence
-  imageUrl: string;
+  imageUrlHorizontal: string;
+  imageUrlVertical?: string;
   imageIsRandom: boolean;
 }
 
@@ -30,19 +31,19 @@ const emojiMap: { [key: string]: string } = {
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<MainPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/statistics" element={<StatisticsPage />} />
+      <Route key='main-page' path="/" element={<MainPage />} />
+      <Route key='login-page' path="/login" element={<LoginPage />} />
+      <Route key='register' path="/register" element={<RegisterPage />} />
+      <Route key='statistics' path="/statistics" element={<StatisticsPage />} />
       {LANGUAGE_PAIRS.map((pair, i) => (
         <>
           <Route key={`sentence-${i}-random`} path={`/sentence/${pair.L1}/${pair.L2}/random`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='random' />} />
           <Route key={`sentence-${i}-length`} path={`/sentence/${pair.L1}/${pair.L2}/length`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='length' />} />
-          <Route key={`sentence-${i}-length`} path={`/sentence/${pair.L1}/${pair.L2}/length/:n`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='length' />} />
-          </>
+          <Route key={`sentence-${i}-length-n`} path={`/sentence/${pair.L1}/${pair.L2}/length/:n`} element={<SentencePlayer L1={pair.L1} L2={pair.L2} mode='length' />} />
+        </>
       ))}
       {LANGUAGE_PAIRS.map((pair, i) => (
-        <Route key={`sentence-${i}`} path={`/word/${pair.L1}/${pair.L2}`} element={<SentenceListViewer L1={pair.L1} L2={pair.L2} />} />
+        <Route key={`word-${i}`} path={`/word/${pair.L1}/${pair.L2}`} element={<SentenceListViewer L1={pair.L1} L2={pair.L2} />} />
       ))}
     </Routes>
   )
@@ -165,7 +166,7 @@ function RegisterPage() {
       // Show error message in popup
       alert('Failed to register');
     });
-  }, [email, password]);
+  }, [email, password, navigate]);
 
   return (
     <>
@@ -205,7 +206,6 @@ function StatisticsPage() {
     fetch('/api/statistics')
       .then((response) => response.json())
       .then((data) => {
-        console.log("statistics", data);
         setStatistics(data);
       })
       .catch((e) => {
@@ -265,11 +265,7 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
   const [sentences, setSentences] = React.useState<Sentence[]>([]);
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [hideL1, setHideL1] = React.useState(false);
-  const [randomState, setRandomState] = React.useState(0);
-
-  useEffect(() => {
-    updateWord(null, "next");
-  }, []);
+  const [randomState, setRandomState] = React.useState<number | null>(null);
 
   useEffect(() => {
     // Keyboard event listener
@@ -295,7 +291,6 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
         `/api/word/${L1}/${L2}/random?seed=${state}&action=${action}` :
         `/api/word/${L1}/${L2}/random?action=${action}`
     )
-    console.log(url);
     fetch(url)
       .then((response) => response.json())
       .then((data) => {
@@ -303,13 +298,16 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
         setSentences(data.sentences);
         setCurrentSentenceIndex(0);
         setRandomState(data.state);
-        console.log(data.state);
       })
       .catch((e) => {
         // Show error message in popup
         alert('Failed to load the word: ' + e);
       });
   }, [L1, L2, setTitle, setSentences, setCurrentSentenceIndex, setRandomState]);
+
+  useEffect(() => {
+    updateWord(null, "next");
+  }, [updateWord]);
 
   const updateSentenceIndex = useCallback(() => {
     if (currentSentenceIndex + 1 >= sentences.length) {
@@ -325,7 +323,7 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
       return;
     }
     setCurrentSentenceIndex((pre) => pre - 1);
-  }, [currentSentenceIndex, setCurrentSentenceIndex, randomState]);
+  }, [currentSentenceIndex, setCurrentSentenceIndex, randomState, updateWord]);
 
   // Overlay left 20% of the screen shows the word and sentence list
   // on top of the image (SentenceViewer).
@@ -379,8 +377,8 @@ function SentenceListViewer({ L1, L2, onExit }: { L1: string, L2: string, onExit
                   {sentences.map((sentence, i) => (
                     <li key={i} style={{ cursor: "pointer" }} onClick={() => setCurrentSentenceIndex(i)}>
                       {i === currentSentenceIndex ?
-                        <b>{currentTranslation == L1 ? sentence.sentence1 : sentence.sentence2}</b> :
-                        currentTranslation == L1 ? sentence.sentence1 : sentence.sentence2}
+                        <b>{currentTranslation === L1 ? sentence.sentence1 : sentence.sentence2}</b> :
+                        currentTranslation === L1 ? sentence.sentence1 : sentence.sentence2}
                     </li>
                   ))}
                 </ul>
@@ -411,14 +409,14 @@ function SentenceViewer({ sentence, onPreviousRequest, onNextRequest, hideL1, nR
         onPreviousRequest();
       else if (e.key === "f")
         toggleFullscreen();
-      else console.log(e.key);
+      else console.log("Unknown key", e.key);
     }
 
     document.addEventListener('keydown', handleKeyDown);
     return function cleanup() {
       document.removeEventListener('keydown', handleKeyDown);
     }
-  }, [onNextRequest]);
+  }, [onNextRequest, onPreviousRequest]);
 
   const playToggle = () => {
     if (audioRef.current) {
@@ -459,7 +457,12 @@ function SentenceViewer({ sentence, onPreviousRequest, onNextRequest, hideL1, nR
       {sentence && (
         /* Image in full screen, and overlay the sentence in the middle on top of the image */
         <div>
-          <img src={`${sentence?.imageUrl}`} style={{ width: "100vw", height: "100vh", objectFit: "cover", display: "block" }} onClick={playToggle} />
+          <img key='img-horizontal' alt={sentence.sentence1} className="image-horizontal" src={`${sentence?.imageUrlHorizontal}`} style={{
+            width: "100vw", height: "100vh", objectFit: "cover"
+          }} onClick={playToggle} />
+          <img key='img-vertical' alt={sentence.sentence1} className="image-vertical" src={`${sentence?.imageUrlVertical || sentence?.imageUrlHorizontal}`} style={{
+            width: "100vw", height: "100vh", objectFit: "cover"
+          }} onClick={playToggle} />
           {/* Text align center */}
           <div style={{ position: 'absolute', bottom: '50%', left: '20%', right: '20%', transform: 'translate(0%, 50%)' }} onClick={playToggle}>
             {
@@ -506,13 +509,8 @@ interface SentencePlayerProps {
 
 function SentencePlayer({ L1, L2, nRepeat, mode }: SentencePlayerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
-  const {n} = useParams();
-  const [randomState, setRandomState] = React.useState(n || 0);
-
-  React.useEffect(() => {
-    // Load sentences from the server
-    updateCurrentSentence();
-  }, []);
+  const { n } = useParams();
+  const [randomState, setRandomState] = React.useState<string | null>(n || null);
 
   const updateCurrentSentence = useCallback(
     () => {
@@ -533,7 +531,6 @@ function SentencePlayer({ L1, L2, nRepeat, mode }: SentencePlayerProps) {
         fetch(url)
           .then((response) => response.json())
           .then((data) => {
-            console.log(randomState, data.state);
             setCurrentSentence(data.sentence);
             setRandomState(data.state);
           })
@@ -543,6 +540,11 @@ function SentencePlayer({ L1, L2, nRepeat, mode }: SentencePlayerProps) {
           });
       }
     }, [setCurrentSentence, setRandomState, L1, L2, randomState, mode]);
+
+  React.useEffect(() => {
+    // Load sentences from the server
+    updateCurrentSentence();
+  }, []);
 
   return (
     <>

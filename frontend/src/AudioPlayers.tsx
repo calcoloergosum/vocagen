@@ -12,9 +12,8 @@ export function AlternatingAudioPlayer({ urls, nRepeat, onEnded, audioRef }: { u
     React.useEffect(() => {
         setWhichAudio({ isL1: true, audioIndexL2: 0 });
         audioRef.current?.load();
-    }, urls);
+    }, [urls, audioRef]);
 
-    console.log(`${whichAudio.isL1 ? L1audio : L2audios[whichAudio.audioIndexL2 % L2audios.length]}`);
     return (
         <>
             {/* Play audio */}
@@ -62,7 +61,7 @@ export function SequentialAudioPlayer({ urls, nRepeat, onEnded: onEndedOuter, au
     // Reset the audio player when the urls change
     React.useEffect(() => {
         setAudioIndex(0);
-    }, urls);
+    }, [urls, setAudioIndex]);
 
     const onEnded = useCallback(() => {
         // Play the next audio
