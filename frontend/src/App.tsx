@@ -510,7 +510,7 @@ interface SentencePlayerProps {
 function SentencePlayer({ L1, L2, nRepeat, mode }: SentencePlayerProps) {
   const [currentSentence, setCurrentSentence] = React.useState<Sentence | null>(null);
   const { n } = useParams();
-  const [randomState, setRandomState] = React.useState<string | null>(n || null);
+  const [randomState, setRandomState] = React.useState<string | null>(mode == 'random'? (n || null): (n || '0'));
 
   const updateCurrentSentence = useCallback(
     () => {
