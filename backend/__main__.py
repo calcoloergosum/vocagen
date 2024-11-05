@@ -1,4 +1,3 @@
-import hashlib
 import json
 import logging
 import os
@@ -10,7 +9,19 @@ import flask
 import flask_login
 import vocagen
 from .types import User
-from . import dbutils
+from . import dbutils, resource_util
+
+
+IS_DEVEL = os.environ.get('FLASK_ENV', 'production').lower() == 'development'
+if IS_DEVEL:
+    print("Launching in development mode.")
+    app = flask.Flask(__name__, static_folder='frontend/public')
+else:
+    app = flask.Flask(__name__, static_folder='frontend/build')
+app.secret_key = pathlib.Path("secret_key.txt").read_text().strip()
+login_manager = flask_login.LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 
 def format_dict_keys(d):
@@ -33,70 +44,12 @@ def snake_to_camel(s):
     return "".join(res)
 
 
-def sentence2id(s):
-    return hashlib.sha256(s.encode('utf8')).hexdigest()
-
-
-langpair2root = {
-    "en": {
-        "hi": pathlib.Path("assets/en/hi"),
-        "ko": pathlib.Path("assets/en/ko"),
-        "ja": pathlib.Path("assets/en/ja"),
-        "ru": pathlib.Path("assets/en/ru"),
-    },
-    "ja": {
-        "en": pathlib.Path("assets/ja/en"),
-    }
-}
-
-L1_2_L2_2sentences = {
-    l1: {
-        l2: json.loads((root / f"translation_{l1}.json").read_text())
-        for l2, root in l2_2_root.items()
-    }
-    for l1, l2_2_root in langpair2root.items()
-}
-L1_2_L2_2sentences_keys = {
-    l1: {
-        l2: sorted(L1_2_L2_2sentences[l1][l2].keys(), key=lambda x: (len(x), x))
-        for l2 in L1_2_L2_2sentences[l1]
-    }
-    for l1 in L1_2_L2_2sentences
-}
-
-L1_2_L2_2words = {
-    l1: {
-        l2: sorted((root / 'llm').glob("*"))
-        for l2, root in l2_2_root.items()
-    }
-    for l1, l2_2_root in langpair2root.items()
-}
-L1_2_L2_2images = {
-    l1: {
-        l2: sorted((root / 'image').glob(f"*.png")) + sorted((root / 'image_v2').glob(f"*.png"))
-        for l2, root in l2_2_root.items()
-    }
-    for l1, l2_2_root in langpair2root.items()
-}
-
-IS_DEVEL = os.environ.get('FLASK_ENV', 'production').lower() == 'development'
-if IS_DEVEL:
-    print("Launching in development mode.")
-    app = flask.Flask(__name__, static_folder='frontend/public')
-else:
-    app = flask.Flask(__name__, static_folder='frontend/build')
-app.secret_key = pathlib.Path("secret_key.txt").read_text().strip()
-login_manager = flask_login.LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-
 @app.route('/api/getSupportedLanguagePairs')
 def getSupportedLanguages():
     return flask.jsonify(format_dict_keys({
         "pairs": [
             {"L1": L1, "L2": L2}
-            for L1, L2s in langpair2root.keys()
+            for L1, L2s in resource_util.langpair2root.keys()
             for L2 in L2s
         ]
     }))
@@ -113,7 +66,12 @@ def random_sentence(L1: str, L2: str):
     
     # update seed
     try:
-        s = int(flask.request.args.get('seed', '0'), 16)
+        seed = flask.request.args.get('seed', None)
+        print(seed)
+        if seed is None:
+            seed = random.getrandbits(64)
+        else:
+            s = int(seed, 16)
     except ValueError:
         logging.warning("Wrong value. Use random seed.")
         s = random.getrandbits(64)
@@ -124,7 +82,7 @@ def random_sentence(L1: str, L2: str):
     action = flask.request.args.get('action', 'next')
     v = rlcg.next() if action == 'next' else rlcg.prev()
 
-    s_L2 = L1_2_L2_2sentences_keys[L1][L2][int(v % len(L1_2_L2_2sentences[L1][L2]))]
+    s_L2 = resource_util.L1_2_L2_2sentences_keys[L1][L2][int(v % len(resource_util.L1_2_L2_2sentences[L1][L2]))]
     sentence = load_sentence(L1, L2, s_L2)
     return flask.jsonify(format_dict_keys({
         'sentence': sentence,
@@ -143,7 +101,11 @@ def length_sorted_sentence(L1: str, L2: str):
 
     # update seed
     try:
-        s = int(flask.request.args.get('seed', '0'), 16)
+        seed = flask.request.args.get('seed', None)
+        if seed is None:
+            seed = random.getrandbits(64)
+        else:
+            s = int(seed, 16)
     except ValueError:
         logging.warning("Wrong value. Use random seed.")
         s = random.getrandbits(64)
@@ -153,8 +115,8 @@ def length_sorted_sentence(L1: str, L2: str):
     action = flask.request.args.get('action', 'next')
     v = s + 1 if action == 'next' else s - 1
 
-    L1_2_L2_2sentences_keys[L1][L2][int(s % len(L1_2_L2_2sentences[L1][L2]))]
-    s_L2 = L1_2_L2_2sentences_keys[L1][L2][int(s % len(L1_2_L2_2sentences[L1][L2]))]
+    resource_util.L1_2_L2_2sentences_keys[L1][L2][int(s % len(resource_util.L1_2_L2_2sentences[L1][L2]))]
+    s_L2 = resource_util.L1_2_L2_2sentences_keys[L1][L2][int(s % len(resource_util.L1_2_L2_2sentences[L1][L2]))]
     sentence = load_sentence(L1, L2, s_L2)
     return flask.jsonify(format_dict_keys({
         'sentence': sentence,
@@ -166,7 +128,11 @@ def length_sorted_sentence(L1: str, L2: str):
 def random_word(L1: str, L2: str):
     """Return random sentence pair from L2 to L1."""
     try:
-        s = int(flask.request.args.get('seed', None), 16)
+        seed = flask.request.args.get('seed', None)
+        if seed is None:
+            seed = random.getrandbits(64)
+        else:
+            s = int(seed, 16)
     except ValueError:
         logging.warning("Wrong value. Use random seed.")
         s = random.getrandbits(64)
@@ -177,7 +143,7 @@ def random_word(L1: str, L2: str):
     action = flask.request.args.get('action', 'next')
 
     for i_try in range(10):  # Try 10 times
-        files = L1_2_L2_2words[L1][L2]
+        files = resource_util.L1_2_L2_2words[L1][L2]
         v = rlcg.next() if action == 'next' else rlcg.prev()
         wordfile = files[int(v % len(files))]
         worddata = json.loads(wordfile.read_text())
@@ -202,13 +168,13 @@ def random_word(L1: str, L2: str):
 
 def load_sentence(L1: str, L2: str, s_L2: str):
     try:
-        s_L1 = L1_2_L2_2sentences[L1][L2][s_L2]
+        s_L1 = resource_util.L1_2_L2_2sentences[L1][L2][s_L2]
     except KeyError:
         raise FileNotFoundError(f"Translation for {s_L2} not found.")
 
-    id_L1 = sentence2id(s_L1)
-    id_L2 = sentence2id(s_L2)
-    audio_L1s = sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L1}_*.mp3"))
+    id_L1 = resource_util.sentence2id(s_L1)
+    id_L2 = resource_util.sentence2id(s_L2)
+    audio_L1s = sorted((resource_util.langpair2root[L1][L2] / 'audio').glob(f"{id_L1}_*.mp3"))
     if len(audio_L1s) == 0:
         raise FileNotFoundError(f"Audio file for {id_L1} not found.")
     if len(audio_L1s) != 1:
@@ -219,7 +185,7 @@ def load_sentence(L1: str, L2: str, s_L2: str):
         app.url_for('audio', L1=L1, L2=L2, filename=audio_L1.name),
         *[
             app.url_for('audio', L1=L1, L2=L2, filename=p.name)
-            for p in sorted((langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
+            for p in sorted((resource_util.langpair2root[L1][L2] / 'audio').glob(f"{id_L2}_*.mp3"))
         ]
     ]
     if L1 == "en":
@@ -229,10 +195,9 @@ def load_sentence(L1: str, L2: str, s_L2: str):
     else:
         raise NotImplementedError(f"Unsupported language pair {L1} -> {L2} (Should include English).")
 
-    is_success, _, l1l2filename = filepath_image(L1, L2, f"{id}.png")
-    image_url = app.url_for('image', **dict(zip(["L1", "L2", "filename"], l1l2filename)))
-    # audio_urls = [url.strip("/") for url in audio_urls]
-    # image_url = image_url.strip("/")
+    is_success, _, (l1, l2, filename) = filepath_image(L1, L2, f"{id}.png")
+    image_url_horizontal = app.url_for('image_horizontal', L1=l1, L2=l2, filename=filename)
+    image_url_vertical = app.url_for('image_vertical', L1=l1, L2=l2, filename=filename)
     return {
         "id_L1": id_L1,
         "id_L2": id_L2,
@@ -241,14 +206,25 @@ def load_sentence(L1: str, L2: str, s_L2: str):
         "sentence1": s_L1,
         "sentence2": s_L2,
         "audio_urls": audio_urls,
-        "image_url": image_url,
+        "image_url_horizontal": image_url_horizontal,
+        "image_url_vertical": image_url_vertical,
         "image_is_random": not is_success,
     }
 
-@app.route("/assets/<string:L1>/<string:L2>/image/<string:filename>")
-def image(L1: str, L2: str, filename: str):
+@app.route("/assets/<string:L1>/<string:L2>/image-horizontal/<string:filename>")
+def image_horizontal(L1: str, L2: str, filename: str):
     _, filepath, _ = filepath_image(L1, L2, filename)
     return flask.send_file(filepath.absolute(), mimetype='image/png')
+
+
+@app.route("/assets/<string:L1>/<string:L2>/image-vertical/<string:filename>")
+def image_vertical(L1: str, L2: str, filename: str):
+    _, filepath, _ = filepath_image(L1, L2, filename)
+    filepath2 = pathlib.Path(filepath.as_posix().replace("-horizontal", "-vertical"))
+    try:
+        return flask.send_file(filepath2.absolute(), mimetype='image/png')
+    except FileNotFoundError:
+        return flask.send_file(filepath.absolute(), mimetype='image/png')
 
 
 @login_manager.user_loader
@@ -286,12 +262,12 @@ def register():
 
 
 def filepath_image(L1, L2, filename: str):
-    filepath = langpair2root[L1][L2] / 'image' / filename
+    filepath = resource_util.langpair2root[L1][L2] / 'image-horizontal' / filename
     if filepath.exists():
         return True, filepath, (L1, L2, filename),
     else:
         print(f"File not found {filepath}. Fallback to random image.")
-        filepath = random.choice(L1_2_L2_2images[L1][L2])
+        filepath = random.choice(resource_util.L1_2_L2_2images[L1][L2])
         return False, filepath, (L1, L2, filename),
 
 
@@ -302,7 +278,7 @@ def report_issue():
     L1, L2 = data["l1"], data["l2"]
     reason = data['reason']
 
-    filepath = langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
+    filepath = resource_util.langpair2root[L1][L2] / 'image' / f'{pathlib.Path(data["imageUrl"]).stem}.png'
     if not filepath.exists():
         print(f"File not found {filepath.as_posix()}.")
         return flask.Response(status=404)
@@ -318,14 +294,15 @@ def report_issue():
     return "Done"
 
 
-if IS_DEVEL:
-    @app.route('/assets/<string:L1>/<string:L2>/audio/<string:filename>')
-    def audio(L1: str, L2: str, filename: str):
-        return flask.send_from_directory(
-            (langpair2root[L1][L2] / 'audio').absolute(), filename,
-            mimetype="audio/mp3", conditional=True)
-
+@app.route('/assets/<string:L1>/<string:L2>/audio/<string:filename>')
+def audio(L1: str, L2: str, filename: str):
     # In production, nginx should serve the static files.
+    if not IS_DEVEL:
+        raise ValueError("This should not be called in production.")
+    return flask.send_from_directory(
+        (resource_util.langpair2root[L1][L2] / 'audio').absolute(), filename,
+        mimetype="audio/mp3", conditional=True)
+
 
 if IS_DEVEL:
     print("Development setting")

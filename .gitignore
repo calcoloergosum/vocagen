@@ -5,3 +5,4 @@ assets/*/*/sentences.json
 
 .DS_Store
 reported.txt
+node_modules
